@@ -112,16 +112,11 @@ for source, targets in graph_data.items():
 # ============================================================
 # ÉTAPE 2 - Écrire et vérifier les règles d'un flot valide
 # ============================================================
-# Débit f(u, v) envoyé sur chaque arc (u, v).
-# Ces valeurs servent de point de départ avant les augmentations.
+# Débit initial nul pour chaque arc du graphe.
+# L'algorithme calculera ensuite le flot à partir des capacités.
 debits = {
-    ("DC-A", "R1"): 70,
-    ("DC-A", "R2"): 50,
-    ("R1", "R3"): 30,
-    ("R1", "Zone-X"): 40,
-    ("R2", "R3"): 20,
-    ("R2", "Zone-X"): 30,
-    ("R3", "Zone-X"): 50,
+    arc: 0
+    for arc in G.edges
 }
 
 # # Règle (i) : le débit d'un arc ne doit jamais dépasser sa capacité.
@@ -267,7 +262,6 @@ for arc in debits:
     )
 
 # La valeur totale du flot est le débit qui sort de la source.
-# Ici, la source est DC-A.
 valeur_totale_flot = 0
 
 for cible in G.successors(source):
@@ -368,13 +362,7 @@ print(f"Contraintes de capacité respectées : {capacites_finales_respectees}")
 print(f"Conservation respectée : {conservation_finale_respectee}")
 
 # Vérification visuelle du graphe de l'Étape 1.
-pos = {
-    'DC-A': (0, 1),    
-    'R1': (1, 2),      
-    'R2': (1, 0),      
-    'R3': (2, 1),      
-    'Zone-X': (3, 1)   
-}
+pos = nx.spring_layout(G, seed=42)
 
 # Visualisation du graphe avec mise en évidence des arcs saturés
 plt.figure(figsize=(9, 6))
