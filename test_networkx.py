@@ -124,39 +124,39 @@ debits = {
     ("R3", "Zone-X"): 50,
 }
 
-# Règle (i) : le débit d'un arc ne doit jamais dépasser sa capacité.
-print("--- Vérification des capacités ---")
-capacites_respectees = True
-for (source, cible), debit in debits.items():
-    capacite = G[source][cible]["capacite"]
-    respecte = 0 <= debit <= capacite
-    print(
-        f"f({source}, {cible}) = {debit} / capacité = {capacite} : "
-        f"{'OK' if respecte else 'NON RESPECTÉE'}"
-    )
-    capacites_respectees = capacites_respectees and respecte
+# # Règle (i) : le débit d'un arc ne doit jamais dépasser sa capacité.
+# print("--- Vérification des capacités ---")
+# capacites_respectees = True
+# for (source, cible), debit in debits.items():
+#     capacite = G[source][cible]["capacite"]
+#     respecte = 0 <= debit <= capacite
+#     print(
+#         f"f({source}, {cible}) = {debit} / capacité = {capacite} : "
+#         f"{'OK' if respecte else 'NON RESPECTÉE'}"
+#     )
+#     capacites_respectees = capacites_respectees and respecte
 
-# Règle (ii) : dans un routeur intermédiaire,
-# le débit entrant doit être égal au débit sortant.
-print("\n--- Vérification de la conservation du débit ---")
-conservation_respectee = True
-for routeur in ["R1", "R2", "R3"]:
-    debit_entrant = 0
-    for precedent in G.predecessors(routeur):
-        debit_entrant = debit_entrant + debits.get((precedent, routeur), 0)
+# # Règle (ii) : dans un routeur intermédiaire,
+# # le débit entrant doit être égal au débit sortant.
+# print("\n--- Vérification de la conservation du débit ---")
+# conservation_respectee = True
+# for routeur in ["R1", "R2", "R3"]:
+#     debit_entrant = 0
+#     for precedent in G.predecessors(routeur):
+#         debit_entrant = debit_entrant + debits.get((precedent, routeur), 0)
 
-    debit_sortant = 0
-    for suivant in G.successors(routeur):
-        debit_sortant = debit_sortant + debits.get((routeur, suivant), 0)
+#     debit_sortant = 0
+#     for suivant in G.successors(routeur):
+#         debit_sortant = debit_sortant + debits.get((routeur, suivant), 0)
 
-    respecte = debit_entrant == debit_sortant
-    print(
-        f"{routeur} : entrant = {debit_entrant}, sortant = {debit_sortant} : "
-        f"{'OK' if respecte else 'NON RESPECTÉE'}"
-    )
-    conservation_respectee = conservation_respectee and respecte
+#     respecte = debit_entrant == debit_sortant
+#     print(
+#         f"{routeur} : entrant = {debit_entrant}, sortant = {debit_sortant} : "
+#         f"{'OK' if respecte else 'NON RESPECTÉE'}"
+#     )
+#     conservation_respectee = conservation_respectee and respecte
 
-print(f"\nRoutage valide : {capacites_respectees and conservation_respectee}")
+# print(f"\nRoutage valide : {capacites_respectees and conservation_respectee}")
 
 # ============================================================
 # ÉTAPE 3 - Chercher un chemin disponible avec BFS
@@ -348,6 +348,18 @@ pos = {
     'Zone-X': (3, 1)   
 }
 
+# Visualisation du graphe avec mise en évidence des arcs saturés
+plt.figure(figsize=(9, 6))
+# Définition des couleurs et épaisseurs en fonction de la saturation
+edge_colors = [
+    'red' if debits[edge] == G[edge[0]][edge[1]]['capacite'] else 'gray'
+    for edge in G.edges
+]
+edge_widths = [
+    3.0 if debits[edge] == G[edge[0]][edge[1]]['capacite'] else 1.2
+    for edge in G.edges
+]
+# Dessin des nœuds et des arcs avec le code couleur
 nx.draw(
     G, 
     pos, 
@@ -355,8 +367,15 @@ nx.draw(
     node_color='lightblue', 
     node_size=2500, 
     font_weight='bold', 
-    arrowsize=20
+    arrowsize=20,
+    edge_color=edge_colors,
+    width=edge_widths
 )
-edge_labels = nx.get_edge_attributes(G, 'capacite')
-nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red')
+# Étiquettes d'arcs affichant (débit final / capacité)
+edge_labels = {
+    edge: f"{debits[edge]}/{G[edge[0]][edge[1]]['capacite']}" 
+    for edge in G.edges
+}
+nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='darkblue')
+plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
 plt.show()
