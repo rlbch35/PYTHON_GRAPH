@@ -162,6 +162,32 @@ debits = {
 # ÉTAPE 3 - Chercher un chemin disponible avec BFS
 # ÉTAPE 4 - Augmenter le flot
 # ============================================================
+# Détection automatique de la source et du puits.
+# La source n'a aucun arc entrant et le puits n'a aucun arc sortant.
+sources = [
+    sommet for sommet in G.nodes
+    if G.in_degree(sommet) == 0
+]
+sinks = [
+    sommet for sommet in G.nodes
+    if G.out_degree(sommet) == 0
+]
+
+if len(sources) != 1:
+    raise ValueError(
+        "Le graphe doit avoir une seule source, "
+        f"mais {len(sources)} ont été trouvées : {sources}"
+    )
+
+if len(sinks) != 1:
+    raise ValueError(
+        "Le graphe doit avoir un seul puits, "
+        f"mais {len(sinks)} ont été trouvés : {sinks}"
+    )
+
+source = sources[0]
+sink = sinks[0]
+
 # Création du réseau résiduel.
 #
 # Pour chaque arc, la capacité résiduelle correspond à la capacité
@@ -180,9 +206,6 @@ for source_arc, cible_arc in G.edges:
 
     capacite_restante = capacite_totale - debit_actuel
     residual[arc] = capacite_restante
-
-source = "DC-A"
-sink = "Zone-X"
 
 # Cette boucle recherche plusieurs chemins successifs.
 # Elle s'arrête seulement lorsqu'il n'existe plus de chemin disponible.
@@ -310,18 +333,23 @@ for arc in G.edges:
 print("\n--- Vérification finale de la conservation ---")
 conservation_finale_respectee = True
 
-for routeur in ["R1", "R2", "R3"]:
+routeurs_intermediaires = [
+    routeur for routeur in G.nodes
+    if routeur != source and routeur != sink
+]
+
+for routeur in routeurs_intermediaires:
     debit_entrant = 0
 
     for precedent in G.predecessors(routeur):
         arc_entrant = (precedent, routeur)
-        debit_entrant = debit_entrant + debits[arc_entrant]
+        debit_entrant = debit_entrant + debits.get(arc_entrant, 0)
 
     debit_sortant = 0
 
     for suivant in G.successors(routeur):
         arc_sortant = (routeur, suivant)
-        debit_sortant = debit_sortant + debits[arc_sortant]
+        debit_sortant = debit_sortant + debits.get(arc_sortant, 0)
 
     if debit_entrant == debit_sortant:
         print(
