@@ -1,0 +1,334 @@
+from asyncio import graph
+
+import networkx as nx
+import matplotlib.pyplot as plt
+
+# ============================================================
+# ÉTAPE 1 - Représenter le graphe
+# ============================================================
+# Pour chaque sommet, on indique ses arcs sortants
+# et la capacité de chaque arc.
+graph_data_etape1 = {
+    "DC-A": [
+        {"to":"R1","capacite": 120},
+        {"to":"R2","capacite": 100}
+    ],
+    "R1": [
+        {"to":"R3","capacite": 70},
+        {"to":"Zone-X","capacite": 40}
+    ],
+    "R2": [
+        {"to":"R3","capacite": 90},
+        {"to":"Zone-X","capacite": 30}
+    ],
+    "R3": [
+        {"to":"Zone-X","capacite": 140}
+    ]
+}
+# Création du graphe orienté NetworkX.
+G = nx.DiGraph()
+
+# Ajout de chaque arc dans le graphe.
+for source, targets in graph_data_etape1.items():
+    for target in targets:
+        # On ajoute l'arête avec sa source, sa destination et sa capacité
+        G.add_edge(source, target["to"], capacite=target["capacite"])
+
+# ============================================================
+# ÉTAPE 2 - Écrire et vérifier les règles d'un flot valide
+# ============================================================
+# Débit f(u, v) envoyé sur chaque arc (u, v).
+# Ces valeurs servent de point de départ avant les augmentations.
+def etape2():
+    #Simulation d'un flot valide sur le graphe pour tester les règles de flot valide graphe residuel
+    debits = {
+        ("DC-A", "R1"): 70,
+        ("DC-A", "R2"): 50,
+        ("R1", "R3"): 30,
+        ("R1", "Zone-X"): 40,
+        ("R2", "R3"): 20,
+        ("R2", "Zone-X"): 30,
+        ("R3", "Zone-X"): 50,
+    }
+
+    # Règle (i) : le débit d'un arc ne doit jamais dépasser sa capacité.
+    print("--- Vérification des capacités ---")
+    capacites_respectees = True
+    for (source, cible), debit in debits.items():
+        capacite = G[source][cible]["capacite"]
+        respecte = 0 <= debit <= capacite
+        print(
+            f"f({source}, {cible}) = {debit} / capacité = {capacite} : "
+            f"{'OK' if respecte else 'NON RESPECTÉE'}"
+        )
+        capacites_respectees = capacites_respectees and respecte
+
+    # Règle (ii) : dans un routeur intermédiaire,
+    # le débit entrant doit être égal au débit sortant.
+    print("\n--- Vérification de la conservation du débit ---")
+    conservation_respectee = True
+    for routeur in ["R1", "R2", "R3"]:
+        debit_entrant = 0
+        for precedent in G.predecessors(routeur):
+            debit_entrant = debit_entrant + debits.get((precedent, routeur), 0)
+
+        debit_sortant = 0
+        for suivant in G.successors(routeur):
+            debit_sortant = debit_sortant + debits.get((routeur, suivant), 0)
+
+        respecte = debit_entrant == debit_sortant
+        print(
+            f"{routeur} : entrant = {debit_entrant}, sortant = {debit_sortant} : "
+            f"{'OK' if respecte else 'NON RESPECTÉE'}"
+        )
+        conservation_respectee = conservation_respectee and respecte
+
+    print(f"\nRoutage valide : {capacites_respectees and conservation_respectee}")
+
+
+## ============================================================
+# PARTIE B
+## ===========================================================
+
+GraphData = dict[str, list[dict[str, int | str]]]
+Flow = dict[tuple[str, str], int]
+Residual = dict[tuple[str, str], int]
+
+def verifier_flot(graphe, debits, sourceNode, arriveeNode):
+    """Vérifie les contraintes de capacité et de conservation du flot."""
+    capacites_respectees = True # on initialise la variable à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes
+    # Aucun débit ne doit être négatif ni dépasser la capacité de son arc. on parcours tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc
+    for arc in graphe.edges:
+        source_arc = arc[0] # on récupère le sommet source de l'arc
+        destination_arc = arc[1] # on récupère le sommet destination de l'arc
+        debit = debits[arc] # on récupère le débit de l'arc
+        capacite = graphe[source_arc][destination_arc]["capacite"] # on récupère la capacité de l'arc dans le graphe en entrée
+
+        # on vérifie que le débit est compris entre 0 et la capacité de l'arc
+        if debit < 0 or debit > capacite:
+            capacites_respectees = False # on met la variable à False si le débit ne respecte pas les contraintes
+            break
+    conservation_respectee = True
+
+    # Pour chaque sommet intermédiaire, le débit entrant doit
+    # être égal au débit sortant. 
+    for node in graphe.nodes:
+        if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
+            continue
+
+        debit_entrant = 0 # on initialise le débit entrant à 0
+        for precedent in graphe.predecessors(node): # on parcourt tous les sommets précédents du sommet courant
+            arc_entrant = (precedent, node) # on récupère l'arc entrant du sommet
+            debit_entrant += debits[arc_entrant] # on ajoute le débit de l'arc entrant au débit entrant total
+
+        debit_sortant = 0
+        for suivant in graphe.successors(node): # on parcourt tous les sommets suivants du sommet courant
+            arc_sortant = (node, suivant) # on récupère l'arc sortant du sommet
+            debit_sortant += debits[arc_sortant] # on ajoute le débit de l'arc sortant au débit sortant total
+
+        if debit_entrant != debit_sortant: # on vérifie que le débit entrant est égal au débit sortant pour le sommet courant
+            conservation_respectee = False
+            break
+
+    verification = {}
+    verification["capacites_respectees"] = capacites_respectees
+    verification["conservation_respectee"] = conservation_respectee
+    return verification
+
+
+def bfs_predecesseurs(graphe, source, puit, residualCapacities):
+    """
+    Cherche un chemin entre source et puit avec une recherche en largeur.
+    La fonction retourne un dictionnaire de prédécesseurs ou None si aucun chemin résiduel n'est disponible. chemin residuel = chemin dans le graphe résiduel, c'est-à-dire un chemin qui respecte les capacités résiduelles des arcs.
+    """
+    parent = {source: None}  # on initialise le dictionnaire des prédécesseurs avec la source comme clé et None comme valeur
+    queue = [source] # on initialise la file d'attente avec le noeud source comme premier élément
+    while queue: 
+        node = queue.pop(0) # on récupère le premier élément de la file d'attente et on le supprime de la file d'attente
+        for voisin in graphe.successors(node): # on parcourt tous les successeurs du noeud courant
+            arc = (node, voisin) # on crée un arc entre le noeud courant et le voisin
+            if arc in residualCapacities:
+                capacite_restante = residualCapacities[arc] # on récupère la capacité résiduelle de l'arc dans le graphe résiduel
+            else:
+                capacite_restante = 0
+
+            sommet_deja_visite = voisin in parent # on vérifie si le voisin a déjà été visité en vérifiant s'il est dans le dictionnaire des prédécesseurs
+            arc_utilisable = capacite_restante > 0 # on vérifie si l'arc est utilisable en vérifiant si la capacité résiduelle est supérieure à 0
+
+            if not sommet_deja_visite and arc_utilisable:
+                parent[voisin] = node # on ajoute le noeud courant comme prédécesseur du voisin dans le dictionnaire des prédécesseurs
+
+
+                # Si le voisin est le puits, on retourne le dictionnaire des prédécesseurs.
+                if voisin == puit:
+                    return parent # on retourne le dictionnaire des prédécesseurs si on a trouvé un chemin jusqu'au puits
+
+                queue.append(voisin) # on ajoute le voisin à la file d'attente pour continuer la recherche 
+
+    return None # on retourne None si aucun chemin n'a été trouvé
+
+def reconstruct_path(parent, source, puit):
+    """Reconstruit le chemin à partir du dictionnaire des prédécesseurs."""
+    if parent is None or puit not in parent:
+        return None
+    # Le chemin est reconstruit en partant du puits et en remontant jusqu'à la source grâce aux prédécesseurs.
+    path = [] # on initialise le chemin comme une liste vide
+    node = puit # on initialise le noeud courant comme le puits
+
+    while node != source: # on continue tant que le noeud courant n'est pas la source
+        precedent = parent[node] # on récupère le prédécesseur du noeud courant grace au dictionnaire des prédécesseurs
+        arc = (precedent, node) # on crée un arc entre le prédécesseur et le noeud courant
+        path.append(arc) # on ajoute l'arc au chemin
+        node = precedent # on met à jour le noeud courant pour continuer la reconstruction du chemin
+
+    # La reconstruction s'est faite à l'envers.
+    path.reverse() # on inverse le chemin pour qu'il soit dans le bon ordre, de la source au puits
+    return path # on retourne le chemin reconstruit
+
+
+def bottleneck(path, residualCapacities):
+    """Retourne la plus petite capacité résiduelle du chemin."""
+    if len(path) == 0:
+        return 0
+    # La capacité du premier arc est la première valeur de référence.
+    plus_petite_capacite = residualCapacities[path[0]]
+
+    # Chaque arc est ensuite comparé à cette valeur.
+    for arc in path: # on parcourt tous les arcs du chemin
+        capacite = residualCapacities[arc] # on récupère la capacité résiduelle de l'arc dans le graphe résiduel
+        if capacite < plus_petite_capacite: # on compare la capacité résiduelle de l'arc avec la plus petite capacité trouvée jusqu'à présent
+            plus_petite_capacite = capacite # on met à jour la plus petite capacité si la capacité résiduelle de l'arc est plus petite
+
+    return plus_petite_capacite # on retourne la plus petite capacité résiduelle du chemin
+
+def trouver_source_et_puits(graph):
+    """Retourne l'unique source et l'unique puits du graphe."""
+    sources = []
+    sinks = []
+    # Une source n'a aucun arc entrant.
+    # Un puits n'a aucun arc sortant.
+    for node in graph.nodes:
+        if graph.in_degree(node) == 0: # on vérifie si le noeud courant est une source en vérifiant s'il n'a aucun arc entrant
+            sources.append(node)
+        if graph.out_degree(node) == 0: # on vérifie si le noeud courant est un puits en vérifiant s'il n'a aucun arc sortant
+            sinks.append(node)
+    if len(sources) != 1:
+        raise ValueError(
+            "Le graphe doit avoir une seule source, "
+            f"mais {len(sources)} ont été trouvées : {sources}"
+        )
+    if len(sinks) != 1:
+        raise ValueError(
+            "Le graphe doit avoir un seul puits, "
+            f"mais {len(sinks)} ont été trouvés : {sinks}"
+        )
+    return sources[0], sinks[0] # on retourne la source et le puits
+
+    
+def calculer_flot(graph):
+    """
+    Calcule le flot maximal par augmentations successives des flots.
+    Cette fonction ne fait aucun affichage et retourne uniquement le résultat
+    du calcul.
+    """
+    source, puit = trouver_source_et_puits(graph) # on récupère la source et le puits du graphe
+    debits: Flow = {} # on initialise le dictionnaire des débits comme un dictionnaire vide
+    for arc in graph.edges: # on parcourt tous les arcs du graphe
+        debits[arc] = 0
+
+    residual: Residual = {} # on initialise le dictionnaire des capacités résiduelles comme un dictionnaire vide (capacités résiduelles = capacités restantes sur les arcs du graphe)
+    for arc in graph.edges: # on parcourt tous les arcs du graphe
+        source_arc = arc[0] # on récupère le sommet source de l'arc
+        destination_arc = arc[1] # on récupère le sommet destination de l'arc
+        residual[arc] = graph[source_arc][destination_arc]["capacite"] # on récupère la capacité de l'arc dans le graphe en entrée et on l'ajoute au dictionnaire des capacités résiduelles
+
+    while True:
+        parent = bfs_predecesseurs(graph, source, puit, residual) # on cherche un chemin disponible dans le graphe résiduel en utilisant la fonction bfs_predecesseurs
+        path = reconstruct_path(parent, source, puit) # on reconstruit le chemin trouvé à partir du dictionnaire des prédécesseurs
+
+        # S'il n'y a plus de chemin disponible, le calcul est terminé.
+        if path is None:
+            break
+        
+        quantite_a_ajouter = bottleneck(path, residual) # on calcule la plus petite capacité résiduelle du chemin trouvé
+
+        for arc in path: # on parcourt tous les arcs du chemin trouvé
+            debits[arc] += quantite_a_ajouter # on augmente le débit de l'arc du chemin trouvé de la quantité à ajouter
+            residual[arc] -= quantite_a_ajouter# on diminue la capacité résiduelle de l'arc du chemin trouvé de la quantité à ajouter
+
+    # La valeur totale du flot est la somme des débits sortant de la source.
+    valeur_totale_flot = 0
+    for cible in graph.successors(source): # on parcourt tous les successeurs de la source pour calculer la valeur totale du flot
+        arc = (source, cible) # on récupère l'arc sortant de la source vers le sommet cible
+        valeur_totale_flot += debits[arc] # on ajoute le débit de l'arc sortant de la source à la valeur totale du flot
+
+    return debits, residual, valeur_totale_flot, source, puit # on retourne les débits, les capacités résiduelles, la valeur totale du flot, la source et le puits
+
+
+def construire_graphe(graph_data: GraphData) -> nx.DiGraph:
+    """Construit un graphe NetworkX à partir des données d'entrée."""
+    graph = nx.DiGraph()
+
+    # Chaque entrée décrit un sommet de départ et ses arcs sortants.
+    for source, targets in graph_data.items():
+        for target in targets:
+            destination = target["to"]
+            capacite = target["capacite"]
+            graph.add_edge(source, destination, capacite=capacite)
+
+    return graph
+
+def dessiner_graphe(graph, debits):
+    """Visualise un flot déjà calculé sans recalculer l'algorithme."""
+    pos = nx.spring_layout(graph, seed=42)
+
+    # Les arcs saturés sont dessinés en rouge et les autres en gris.
+    edge_colors = []
+    edge_widths = []
+    for edge in graph.edges:
+        capacite = graph[edge[0]][edge[1]]["capacite"]
+        if debits[edge] == capacite:
+            edge_colors.append("red")
+            edge_widths.append(3.0)
+        else:
+            edge_colors.append("gray")
+            edge_widths.append(1.2)
+
+    plt.figure(figsize=(9, 6))
+    nx.draw(
+        graph,
+        pos,
+        with_labels=True,
+        node_color="lightblue",
+        node_size=2500,
+        font_weight="bold",
+        arrowsize=20,
+        edge_color=edge_colors,
+        width=edge_widths,
+    )
+    # Chaque étiquette indique le débit actuel et la capacité de l'arc.
+    edge_labels = {}
+    for edge in graph.edges:
+        capacite = graph[edge[0]][edge[1]]["capacite"]
+        edge_labels[edge] = f"{debits[edge]}/{capacite}"
+    nx.draw_networkx_edge_labels(
+        graph, pos, edge_labels=edge_labels, font_color="darkblue"
+    )
+    plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
+    plt.show()
+
+
+
+
+def main():
+    """Exécute le scénario complet : entrée, calcul, résultats, affichage."""
+    graph = construire_graphe(graph_data_etape1)
+    debits, residual, valeur_totale_flot, source, puit = calculer_flot(graph)
+    afficher_resultats(
+        graph, debits, residual, valeur_totale_flot, source, puit
+    )
+    dessiner_graphe(graph, debits)
+
+
+if __name__ == "__main__":
+    main()
