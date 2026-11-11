@@ -555,4 +555,4 @@ Dans cette exécution précise, aucun chemin augmentant n’utilise effectivemen
 
 Representation graphique :
 
-![](C:/Users/UTILIS~1/AppData/Local/Temp/solomd/image-20261111-141509-8vzpi1.png)
+![](TP_1.png)
