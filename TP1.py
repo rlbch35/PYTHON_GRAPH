@@ -34,12 +34,35 @@ for source, targets in graph_data_etape1.items():
         # On ajoute l'arête avec sa source, sa destination et sa capacité
         G.add_edge(source, target["to"], capacite=target["capacite"])
 
+# Vérification visuelle du graphe de l'Étape 1.
+pos = {
+    'DC-A': (0, 1),    
+    'R1': (1, 2),      
+    'R2': (1, 0),      
+    'R3': (2, 1),      
+    'Zone-X': (3, 1)   
+}
+
+nx.draw(
+    G, 
+    pos, 
+    with_labels=True, 
+    node_color='lightblue', 
+    node_size=2500, 
+    font_weight='bold', 
+    arrowsize=20
+)
+edge_labels = nx.get_edge_attributes(G, 'capacite')
+nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red')
+plt.show()
+
+
 # ============================================================
 # ÉTAPE 2 - Écrire et vérifier les règles d'un flot valide
 # ============================================================
 # Débit f(u, v) envoyé sur chaque arc (u, v).
 # Ces valeurs servent de point de départ avant les augmentations.
-def etape2():
+def etape2(G):
     #Simulation d'un flot valide sur le graphe pour tester les règles de flot valide graphe residuel
     debits = {
         ("DC-A", "R1"): 70,
@@ -51,21 +74,21 @@ def etape2():
         ("R3", "Zone-X"): 50,
     }
 
-    # Règle (i) : le débit d'un arc ne doit jamais dépasser sa capacité.
+    # Règle (i) version 1: le débit d'un arc ne doit jamais dépasser sa capacité. 
     print("--- Vérification des capacités ---")
     capacites_respectees = True
     for (source, cible), debit in debits.items():
         capacite = G[source][cible]["capacite"]
-        respecte = 0 <= debit <= capacite
+        respecte = 0 <= debit <= capacite # on vérifie que 0 ≤ f(u, v) ≤ c(u, v)
         print(
             f"f({source}, {cible}) = {debit} / capacité = {capacite} : "
             f"{'OK' if respecte else 'NON RESPECTÉE'}"
         )
         capacites_respectees = capacites_respectees and respecte
 
-    # Règle (ii) : dans un routeur intermédiaire,
-    # le débit entrant doit être égal au débit sortant.
-    print("\n--- Vérification de la conservation du débit ---")
+    # Règle (ii) version 1 : dans un routeur intermédiaire,
+    # le débit entrant doit être égal au débit sortant. 
+    print("\n--- Vérification de la conservation du débit pour R1, R2 et R3 ---")
     conservation_respectee = True
     for routeur in ["R1", "R2", "R3"]:
         debit_entrant = 0
@@ -76,7 +99,7 @@ def etape2():
         for suivant in G.successors(routeur):
             debit_sortant = debit_sortant + debits.get((routeur, suivant), 0)
 
-        respecte = debit_entrant == debit_sortant
+        respecte = debit_entrant == debit_sortant # on vérifie que somme des débits entrants = somme des débits sortants pour le noeud courant
         print(
             f"{routeur} : entrant = {debit_entrant}, sortant = {debit_sortant} : "
             f"{'OK' if respecte else 'NON RESPECTÉE'}"
@@ -95,7 +118,7 @@ Flow = dict[tuple[str, str], int]
 Residual = dict[tuple[str, str], int]
 
 def verifier_flot(graphe, debits, sourceNode, arriveeNode):
-    """Vérifie les contraintes de capacité et de conservation du flot."""
+    """Vérification contraintes capacités version 2 """
     capacites_respectees = True # on initialise la variable à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes
     # Aucun débit ne doit être négatif ni dépasser la capacité de son arc. on parcours tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc
     for arc in graphe.edges:
@@ -110,8 +133,8 @@ def verifier_flot(graphe, debits, sourceNode, arriveeNode):
             break
     conservation_respectee = True
 
-    # Pour chaque sommet intermédiaire, le débit entrant doit
-    # être égal au débit sortant. 
+
+    """Vérification contraintes conservation version 2 """
     for node in graphe.nodes:
         if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
             continue
@@ -208,9 +231,9 @@ def trouver_source_et_puits(graph):
     # Une source n'a aucun arc entrant.
     # Un puits n'a aucun arc sortant.
     for node in graph.nodes:
-        if graph.in_degree(node) == 0: # on vérifie si le noeud courant est une source en vérifiant s'il n'a aucun arc entrant
+        if graph.in_degree(node) == 0: # on vérifie si le noeud courant est une source en vérifiant s'il n'a aucun arc entrant, fonction intégrée doc : https://networkx.org/documentation/stable/reference/classes/generated/networkx.DiGraph.in_degree.html
             sources.append(node)
-        if graph.out_degree(node) == 0: # on vérifie si le noeud courant est un puits en vérifiant s'il n'a aucun arc sortant
+        if graph.out_degree(node) == 0: # on vérifie si le noeud courant est un puits en vérifiant s'il n'a aucun arc sortant, fonction intégrée doc : https://networkx.org/documentation/stable/reference/classes/generated/networkx.DiGraph.out_degree.html
             sinks.append(node)
     if len(sources) != 1:
         raise ValueError(
@@ -234,7 +257,7 @@ def calculer_flot(graph):
     source, puit = trouver_source_et_puits(graph) # on récupère la source et le puits du graphe
     debits: Flow = {} # on initialise le dictionnaire des débits comme un dictionnaire vide
     for arc in graph.edges: # on parcourt tous les arcs du graphe
-        debits[arc] = 0
+        debits[arc] = 0 # on initialise le débit de chaque arc à 0
 
     residual: Residual = {} # on initialise le dictionnaire des capacités résiduelles comme un dictionnaire vide (capacités résiduelles = capacités restantes sur les arcs du graphe)
     for arc in graph.edges: # on parcourt tous les arcs du graphe
@@ -260,7 +283,7 @@ def calculer_flot(graph):
     valeur_totale_flot = 0
     for cible in graph.successors(source): # on parcourt tous les successeurs de la source pour calculer la valeur totale du flot
         arc = (source, cible) # on récupère l'arc sortant de la source vers le sommet cible
-        valeur_totale_flot += debits[arc] # on ajoute le débit de l'arc sortant de la source à la valeur totale du flot
+        valeur_totale_flot += debits[arc] # on ajoute les débits de l'arc sortant de la source à la valeur totale du flot
 
     return debits, residual, valeur_totale_flot, source, puit # on retourne les débits, les capacités résiduelles, la valeur totale du flot, la source et le puits
 
@@ -317,6 +340,49 @@ def dessiner_graphe(graph, debits):
     plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
     plt.show()
 
+def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink):
+    """Affiche les résultats d'un calcul déjà effectué."""
+    print("\n--- Débit final sur chaque arc ---")
+    for arc in graph.edges:
+        print(
+            f"f({arc[0]}, {arc[1]}) = {debits[arc]} "
+            f"/ capacité restante = {residual[arc]}"
+        )
+
+    print("\n--- Bilan final du flot ---")
+    print(f"Valeur totale du flot : {valeur_totale_flot}")
+
+    print("\n--- Débit f / capacité c sur chaque arc ---")
+    for arc in graph.edges:
+        capacite = graph[arc[0]][arc[1]]["capacite"]
+        print(
+            f"{arc[0]} -> {arc[1]} : "
+            f"f = {debits[arc]}, c = {capacite}, "
+            f"f/c = {debits[arc] / capacite:.2f}"
+        )
+
+    print("\n--- Arcs saturés ---")
+    arcs_satures = []
+    for arc in graph.edges:
+        capacite = graph[arc[0]][arc[1]]["capacite"]
+        if debits[arc] == capacite:
+            arcs_satures.append(arc)
+    if arcs_satures:
+        for arc in arcs_satures:
+            print(f"{arc[0]} -> {arc[1]}")
+    else:
+        print("Aucun arc saturé.")
+
+    verification = verifier_flot(graph, debits, source, sink)
+    print("\n--- Résultat des vérifications finales ---")
+    print(
+        "Contraintes de capacité respectées : "
+        f"{verification['capacites_respectees']}"
+    )
+    print(
+        f"Conservation respectée : "
+        f"{verification['conservation_respectee']}"
+    )
 
 
 

@@ -225,49 +225,6 @@ def verifier_flot(graph, debits, source, sink):
     return verification
 
 
-def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink):
-    """Affiche les résultats d'un calcul déjà effectué."""
-    print("\n--- Débit final sur chaque arc ---")
-    for arc in graph.edges:
-        print(
-            f"f({arc[0]}, {arc[1]}) = {debits[arc]} "
-            f"/ capacité restante = {residual[arc]}"
-        )
-
-    print("\n--- Bilan final du flot ---")
-    print(f"Valeur totale du flot : {valeur_totale_flot}")
-
-    print("\n--- Débit f / capacité c sur chaque arc ---")
-    for arc in graph.edges:
-        capacite = graph[arc[0]][arc[1]]["capacite"]
-        print(
-            f"{arc[0]} -> {arc[1]} : "
-            f"f = {debits[arc]}, c = {capacite}, "
-            f"f/c = {debits[arc] / capacite:.2f}"
-        )
-
-    print("\n--- Arcs saturés ---")
-    arcs_satures = []
-    for arc in graph.edges:
-        capacite = graph[arc[0]][arc[1]]["capacite"]
-        if debits[arc] == capacite:
-            arcs_satures.append(arc)
-    if arcs_satures:
-        for arc in arcs_satures:
-            print(f"{arc[0]} -> {arc[1]}")
-    else:
-        print("Aucun arc saturé.")
-
-    verification = verifier_flot(graph, debits, source, sink)
-    print("\n--- Résultat des vérifications finales ---")
-    print(
-        "Contraintes de capacité respectées : "
-        f"{verification['capacites_respectees']}"
-    )
-    print(
-        f"Conservation respectée : "
-        f"{verification['conservation_respectee']}"
-    )
 
 
 def dessiner_graphe(graph, debits):
