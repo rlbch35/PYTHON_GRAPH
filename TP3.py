@@ -82,6 +82,52 @@ graph_data_R3Clidisable= {
         ]
 }
 
+# Structure du graphe
+graph_data_datacenter = {
+    "S*": [
+            {"to":"DC-LILLE","capacite": 350},
+            {"to":"DC-PARIS","capacite": 500},
+            {"to":"DC-LYON","capacite": 420}
+        ],
+    "DC-LILLE": [
+            {"to":"LIL","capacite": 350},
+    ],
+    "DC-PARIS": [
+            {"to":"PAR","capacite": 500}
+        ],
+    "DC-LYON": [
+            {"to":"LYO","capacite": 420}
+        ],
+    "LIL": [
+            {"to":"REI","capacite": 240},
+            {"to":"PAR","capacite": 180}
+    ],
+    "PAR": [
+            {"to":"REI","capacite": 320},
+            {"to":"STR","capacite": 260},
+            {"to":"LYO","capacite": 230}
+    ],
+    "LYO": [
+            {"to":"STR","capacite": 230},
+    ],
+    "REI": [
+            {"to":"NORD","capacite": 250},
+            {"to":"IDF","capacite": 350}
+    ],
+    "STR": [
+                {"to":"Sud-Est","capacite": 350},
+                {"to":"IDF","capacite": 180}
+        ],
+    "NORD": [
+            {"to":"T*","capacite": 250}
+        ],
+    "IDF": [
+            {"to":"T*","capacite": 530}
+        ],
+    "Sud-Est": [
+            {"to":"T*","capacite": 350}
+        ]
+}
 
 
 GraphData = dict[str, list[dict[str, int | str]]]
