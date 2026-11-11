@@ -21,6 +21,132 @@ graph_data_etape1 = {
     ]
 }
 
+# Structure du graphe
+graph_data_C = {
+    "S*": [
+            {"to":"DC-LILLE","capacite": 420},
+            {"to":"DC-PARIS","capacite": 650}
+        ],
+    "DC-LILLE": [
+            {"to":"LIL","capacite": 350},
+            {"to":"ROU","capacite": 220}
+    ],
+    "DC-PARIS": [
+            {"to":"ROU","capacite": 250},
+            {"to":"PAR","capacite": 500}
+        ],
+    "LIL": [
+            {"to":"NORD-250","capacite": 160},
+            {"to":"ROU","capacite": 240}
+    ],
+    "PAR": [
+            {"to":"IDF-430","capacite": 400},
+            {"to":"REI","capacite": 320}
+    ],
+    "ROU": [
+            {"to":"PAR","capacite": 280},
+            {"to":"REI","capacite": 180}
+    ],
+    "REI": [
+            {"to":"IDF-430","capacite": 100},
+            {"to":"EST-280","capacite": 260}
+    ],
+    "NORD-250": [
+            {"to":"T*","capacite": 250}
+        ],
+    "IDF-430": [
+            {"to":"T*","capacite": 430}
+        ],
+    "EST-280": [
+            {"to":"T*","capacite": 280}
+        ]
+}
+
+#=============== ETAPE 6 reflexion ====================
+graph_data_C_add100_REItoEST= {
+    "S*": [
+            {"to":"DC-LILLE","capacite": 420},
+            {"to":"DC-PARIS","capacite": 650}
+        ],
+    "DC-LILLE": [
+            {"to":"LIL","capacite": 350},
+            {"to":"ROU","capacite": 220}
+    ],
+    "DC-PARIS": [
+            {"to":"ROU","capacite": 250},
+            {"to":"PAR","capacite": 500}
+        ],
+    "LIL": [
+            {"to":"NORD-250","capacite": 160},
+            {"to":"ROU","capacite": 240}
+    ],
+    "PAR": [
+            {"to":"IDF-430","capacite": 400},
+            {"to":"REI","capacite": 320}
+    ],
+    "ROU": [
+            {"to":"PAR","capacite": 280},
+            {"to":"REI","capacite": 180}
+    ],
+    "REI": [
+            {"to":"IDF-430","capacite": 100},
+            {"to":"EST-280","capacite": 360}
+    ],
+    "NORD-250": [
+            {"to":"T*","capacite": 250}
+        ],
+    "IDF-430": [
+            {"to":"T*","capacite": 430}
+        ],
+    "EST-280": [
+            {"to":"T*","capacite": 280}
+        ]
+}
+
+
+graph_data_C_add100_ROUtoREI = {
+    "S*": [
+            {"to":"DC-LILLE","capacite": 420},
+            {"to":"DC-PARIS","capacite": 650}
+        ],
+    "DC-LILLE": [
+            {"to":"LIL","capacite": 350},
+            {"to":"ROU","capacite": 220}
+    ],
+    "DC-PARIS": [
+            {"to":"ROU","capacite": 250},
+            {"to":"PAR","capacite": 500}
+        ],
+    "LIL": [
+            {"to":"NORD-250","capacite": 160},
+            {"to":"ROU","capacite": 240}
+    ],
+    "PAR": [
+            {"to":"IDF-430","capacite": 400},
+            {"to":"REI","capacite": 320}
+    ],
+    "ROU": [
+            {"to":"PAR","capacite": 280},
+            {"to":"REI","capacite": 280}
+    ],
+    "REI": [
+            {"to":"IDF-430","capacite": 100},
+            {"to":"EST-280","capacite": 260}
+    ],
+    "NORD-250": [
+            {"to":"T*","capacite": 250}
+        ],
+    "IDF-430": [
+            {"to":"T*","capacite": 430}
+        ],
+    "EST-280": [
+            {"to":"T*","capacite": 280}
+        ]
+}
+
+# Conclusion PARTIE D  Pour augmenter la valeur du flot maximal, il faut augmenter la valeur d'un arc de la coupe
+#=================================================================
+
 # ============================================================
 # ÉTAPE 1 - Représenter le graphe
 # ============================================================
@@ -174,7 +300,7 @@ def bfs_predecesseurs(graphe, source, puit, residualCapacities):
     parent = {source: None} # on initialise le dictionnaire des prédécesseurs avec la source comme clé et None comme valeur
     queue = [source] # on initialise la file d'attente avec la source comme premier élément
     while queue:
-        node = queue.pop(0) # on récupère le premier élément de la file d'attente et on le supprime de la file d'attente
+        node = queue.pop(0) # on récupère le premier élément de la file d'attente et on l'enlève de la file.
         for arc in residualCapacities: # on parcourt tous les arcs du graphe résiduel
             source_arc = arc[0]
             destination_arc = arc[1]
@@ -298,10 +424,62 @@ def calculer_flot(graph):
     return debits, residual, valeur_totale_flot, source, puit # on retourne les débits, les capacités résiduelles, la valeur totale du flot, la source et le puits
 
 
+def calculer_coupe_minimale(graph, residual, source):
+    """ 
+    =============== PARTIE D ETAPE 6   =======================================
+    Détermine les ensembles A et B après le calcul du flot maximal.
+
+    A contient les sommets encore accessibles depuis la source
+    dans le réseau résiduel avec une capacité strictement positive.
+
+    B contient tous les autres sommets.
+    """
+    # Ensemble des sommets accessibles depuis la source.
+    sommets_accessibles = {source}
+    # File utilisée pour effectuer une exploration en largeur.
+    queue = [source]
+    while queue:
+        # On récupère le premier sommet de la file et on l'enlève de la file.
+        sommet_courant = queue.pop(0)
+        # On parcourt tous les arcs du réseau résiduel.
+        for arc in residual:
+            sommet_depart = arc[0]
+            sommet_arrivee = arc[1]
+            # L'arc doit partir du sommet actuellement étudié.
+            if sommet_depart != sommet_courant:
+                continue
+            # L'arc doit avoir une capacité résiduelle positive.
+            capacite_restante = residual[arc]
+            if capacite_restante <= 0:
+                continue
+            # On ne visite pas deux fois le même sommet.
+            if sommet_arrivee in sommets_accessibles:
+                continue
+            sommets_accessibles.add(sommet_arrivee) # on ajoute le sommet destination à l'ensemble des sommets accessibles
+            queue.append(sommet_arrivee) # on ajoute le sommet destination à la file pour continuer l'exploration en largeur
+
+    # A contient les sommets accessibles.
+    ensemble_A = sommets_accessibles
+    # B contient les autres sommets du graphe original.
+    ensemble_B = set(graph.nodes) - ensemble_A #on utiliser set(graph.nodes) pour récupérer tous les sommets du graphe original et on soustrait l'ensemble des sommets accessibles
+    
+    arcs_de_la_coupe = [] # on initialise la liste des arcs de la coupe minimale comme une liste vide
+    capacite_de_la_coupe = 0 # on initialise la capacité totale de la coupe minimale à 0
+    for arc in graph.edges:
+        sommet_depart = arc[0]
+        sommet_arrivee = arc[1]
+        if sommet_depart in ensemble_A and sommet_arrivee in ensemble_B: # on vérifie si le sommet départ est dans l'ensemble A et le sommet arrivée est dans l'ensemble B
+            capacite = graph[sommet_depart][sommet_arrivee]["capacite"] # on récupère la capacité de l'arc dans le graphe original
+            arcs_de_la_coupe.append((sommet_depart, sommet_arrivee, capacite)) # on ajoute l'arc à la liste des arcs de la coupe minimale
+            capacite_de_la_coupe += capacite # on ajoute la capacité de l'arc à la capacité totale de la coupe minimale
+
+    return (ensemble_A,ensemble_B,arcs_de_la_coupe,capacite_de_la_coupe) # on retourne l'ensemble A, l'ensemble B, la liste des arcs de la coupe minimale et la capacité totale de la coupe minimale
+
+
+
 def construire_graphe(graph_data: GraphData) -> nx.DiGraph:
     """Construit un graphe NetworkX à partir des données d'entrée."""
     graph = nx.DiGraph()
-
     # Chaque entrée décrit un sommet de départ et ses arcs sortants.
     for source, targets in graph_data.items():
         for target in targets:
@@ -314,7 +492,6 @@ def construire_graphe(graph_data: GraphData) -> nx.DiGraph:
 def dessiner_graphe(graph, debits):
     """Visualise un flot déjà calculé sans recalculer l'algorithme."""
     pos = nx.spring_layout(graph, seed=42)
-
     # Les arcs saturés sont dessinés en rouge et les autres en gris.
     edge_colors = []
     edge_widths = []
@@ -349,6 +526,7 @@ def dessiner_graphe(graph, debits):
     )
     plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
     plt.show()
+
 
 def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink):
     """Affiche les résultats d'un calcul déjà effectué."""
@@ -394,19 +572,31 @@ def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink
         f"{verification['conservation_respectee']}"
     )
 
+    
 
 
 def main():
     """Exécute le scénario complet : entrée, calcul, résultats, affichage."""
     etape1et2(graph_data_etape1)
     
-    graph = construire_graphe(graph_data_etape1)
-    debits, residual, valeur_totale_flot, source, puit = calculer_flot(graph)
-    afficher_resultats(
-        graph, debits, residual, valeur_totale_flot, source, puit
-    )
-    dessiner_graphe(graph, debits)
+    
+    graph = construire_graphe(graph_data_C)
+    debits, residual, valeur_totale_flot, source, puit = (calculer_flot(graph))
+    afficher_resultats(graph,debits, residual,valeur_totale_flot,source,puit)
 
+    ## PARTIE D
+    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph,residual,source))
+
+    print("\n--- Coupe minimale ---")
+    print(f"Ensemble A : {ensemble_A}")
+    print(f"Ensemble B : {ensemble_B}")
+
+    for arc in arcs_de_la_coupe:
+        print(f"{arc[0]} -> {arc[1]} " f"(capacité = {arc[2]})")
+
+    print(f"Capacité de la coupe : {capacite_de_la_coupe}")
+
+    dessiner_graphe(graph, debits)
 
 if __name__ == "__main__":
     main()
