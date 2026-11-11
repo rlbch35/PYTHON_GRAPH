@@ -3,6 +3,8 @@ from asyncio import graph
 import networkx as nx
 import matplotlib.pyplot as plt
 
+
+#### LES GRAPHES
 graph_data_etape1 = {
     "DC-A": [
         {"to":"R1","capacite": 120},
@@ -333,7 +335,6 @@ def reconstruct_path(parent, source, puit):
         path.append(arc) # on ajoute l'arc au chemin
         node = precedent # on met à jour le noeud courant pour continuer la reconstruction du chemin
 
-    # La reconstruction s'est faite à l'envers.
     path.reverse() # on inverse le chemin pour qu'il soit dans le bon ordre, de la source au puits
     return path # on retourne le chemin reconstruit
 
