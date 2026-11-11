@@ -1,4 +1,8 @@
-PARCOURS DE LA BOUCLE CALCULER FLOT DU TP 1 :
+PARCOURS DE LA BOUCLE CALCULER_FLOT DU TP 1 :
+
+Lien video utile (le support de cours commenté... ):
+https://www.youtube.com/watch?v=TgT5MYWI2n4
+https://www.youtube.com/watch?v=N0PUdc-k74g&list=PL-z-gA5Rjv91PK229nkwlBdW9JtjSTuF4&index=6
 
 Pour `graph_data_C` dans `TP1.py`, la source et le puits sont :
 
