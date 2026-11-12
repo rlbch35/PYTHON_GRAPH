@@ -473,7 +473,6 @@ def calculer_coupe_minimale(graph_data, residual, source):
     4. On construit ensuite l'ensemble B avec tous les autres sommets du graphe.
     5. On parcourt tous les arcs du graphe original et on ajoute les arcs de la coupe minimale à la liste des arcs de la coupe minimale.
     6. On calcule la capacité totale de la coupe minimale en additionnant les capacités des arcs de la coupe minimale.
-    7. On retourne l'ensemble A, l'ensemble B, la liste des arcs de la coupe minimale et la capacité totale de la coupe minimale.
     """
     sommets, arcs, _, _ = extraire_donnees_graphe(graph_data)
     # Ensemble des sommets accessibles depuis la source.
