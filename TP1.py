@@ -339,38 +339,12 @@ def bottleneck(path, residualCapacities):
 
     return plus_petite_capacite # on retourne la plus petite capacité résiduelle du chemin
 
-def trouver_source_et_puits(graph_data):
-    """Retourne l'unique source et l'unique puits du graphe."""
-    sommets, _, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
-    sources = []
-    sinks = []
-    # Une source n'a aucun arc entrant.
-    # Un puits n'a aucun arc sortant.
-    for node in sommets:
-        if len(predecesseurs[node]) == 0:
-            sources.append(node)
-        if len(successeurs[node]) == 0:
-            sinks.append(node)
-    if len(sources) != 1:
-        raise ValueError(
-            "Le graphe doit avoir une seule source, "
-            f"mais {len(sources)} ont été trouvées : {sources}"
-        )
-    if len(sinks) != 1:
-        raise ValueError(
-            "Le graphe doit avoir un seul puits, "
-            f"mais {len(sinks)} ont été trouvés : {sinks}"
-        )
-    return sources[0], sinks[0] # on retourne la source et le puits
-
-    
-def calculer_flot(graph_data):
+def calculer_flot(graph_data, source, puit):
     """
     Calcule le flot maximal par augmentations successives des flots.
     Cette fonction ne fait aucun affichage et retourne uniquement le résultat
     du calcul.
     """
-    source, puit = trouver_source_et_puits(graph_data) # on récupère la source et le puits du graphe
     _, arcs, successeurs, _ = extraire_donnees_graphe(graph_data)
     debits: Flow = {} # on initialise le dictionnaire des débits comme un dictionnaire vide
     residual: Residual = {} # on initialise le dictionnaire des capacités résiduelles comme un dictionnaire vide
@@ -400,7 +374,7 @@ def calculer_flot(graph_data):
             residual[arc_inverse] += quantite_a_ajouter # on ajoute la quantité à ajouter à la capacité résiduelle de l'arc inverse
 
     valeur_totale_flot = 0
-    for cible in successeurs[source]: # on parcourt tous les successeurs de la source pour calculer la valeur totale du flot
+    for cible in successeurs.get(source, []): # on parcourt tous les successeurs de la source pour calculer la valeur totale du flot
         arc = (source, cible) # on récupère l'arc sortant de la source vers le sommet cible
         valeur_totale_flot += debits[arc] # on ajoute les débits de l'arc sortant de la source à la valeur totale du flot
 
@@ -589,7 +563,9 @@ def main():
     etape1et2(graph_data_etape1)
     
     
-    debits, residual, valeur_totale_flot, source, puit = (calculer_flot(graph_data_C))
+    source = "S*"
+    puit = "T*"
+    debits, residual, valeur_totale_flot, source, puit = (calculer_flot(graph_data_C, source, puit))
     afficher_resultats(graph_data_C, debits, residual, valeur_totale_flot, source, puit)
 
     ## PARTIE D
