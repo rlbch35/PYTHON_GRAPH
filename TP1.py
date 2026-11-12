@@ -276,46 +276,6 @@ GraphData = dict[str, list[dict[str, int | str]]]
 Flow = dict[tuple[str, str], int]
 Residual = dict[tuple[str, str], int]
 
-def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
-    """Vérification contraintes capacités version 2 """
-    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
-    capacites_respectees = True # on initialise la variable à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes
-    # Aucun débit ne doit être négatif ni dépasser la capacité de son arc. on parcours tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc
-    for arc, capacite in arcs.items():
-        debit = debits[arc] # on récupère le débit de l'arc
-
-        # on vérifie que le débit est compris entre 0 et la capacité de l'arc
-        if debit < 0 or debit > capacite:
-            capacites_respectees = False # on met la variable à False si le débit ne respecte pas les contraintes
-            break
-    conservation_respectee = True
-
-
-    """Vérification contraintes conservation version 2 """
-    for node in sommets:
-        if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
-            continue
-
-        debit_entrant = 0 # on initialise le débit entrant à 0
-        for precedent in predecesseurs[node]: # on parcourt tous les sommets précédents du sommet courant
-            arc_entrant = (precedent, node) # on récupère l'arc entrant du sommet
-            debit_entrant += debits[arc_entrant] # on ajoute le débit de l'arc entrant au débit entrant total
-
-        debit_sortant = 0
-        for suivant in successeurs[node]: # on parcourt tous les sommets suivants du sommet courant
-            arc_sortant = (node, suivant) # on récupère l'arc sortant du sommet
-            debit_sortant += debits[arc_sortant] # on ajoute le débit de l'arc sortant au débit sortant total
-
-        if debit_entrant != debit_sortant: # on vérifie que le débit entrant est égal au débit sortant pour le sommet courant
-            conservation_respectee = False
-            break
-
-    verification = {}
-    verification["capacites_respectees"] = capacites_respectees
-    verification["conservation_respectee"] = conservation_respectee
-    return verification
-
-
 def bfs_predecesseurs(graphe, source, puit, residualCapacities):
     """
     Recherche un chemin augmentant avec une recherche en largeur.
@@ -446,6 +406,45 @@ def calculer_flot(graph_data):
 
     return debits, residual, valeur_totale_flot, source, puit # on retourne les débits, les capacités résiduelles, la valeur totale du flot, la source et le puits
 
+def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
+    """Vérification contraintes capacités version 2 """
+    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
+    capacites_respectees = True # on initialise la variable à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes
+    # Aucun débit ne doit être négatif ni dépasser la capacité de son arc. on parcours tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc
+    for arc, capacite in arcs.items():
+        debit = debits[arc] # on récupère le débit de l'arc
+
+        # on vérifie que le débit est compris entre 0 et la capacité de l'arc
+        if debit < 0 or debit > capacite:
+            capacites_respectees = False # on met la variable à False si le débit ne respecte pas les contraintes
+            break
+    conservation_respectee = True
+
+
+    """Vérification contraintes conservation version 2 """
+    for node in sommets:
+        if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
+            continue
+
+        debit_entrant = 0 # on initialise le débit entrant à 0
+        for precedent in predecesseurs[node]: # on parcourt tous les sommets précédents du sommet courant
+            arc_entrant = (precedent, node) # on récupère l'arc entrant du sommet
+            debit_entrant += debits[arc_entrant] # on ajoute le débit de l'arc entrant au débit entrant total
+
+        debit_sortant = 0
+        for suivant in successeurs[node]: # on parcourt tous les sommets suivants du sommet courant
+            arc_sortant = (node, suivant) # on récupère l'arc sortant du sommet
+            debit_sortant += debits[arc_sortant] # on ajoute le débit de l'arc sortant au débit sortant total
+
+        if debit_entrant != debit_sortant: # on vérifie que le débit entrant est égal au débit sortant pour le sommet courant
+            conservation_respectee = False
+            break
+
+    verification = {}
+    verification["capacites_respectees"] = capacites_respectees
+    verification["conservation_respectee"] = conservation_respectee
+    return verification
+
 
 def calculer_coupe_minimale(graph_data, residual, source):
     """ 
@@ -498,52 +497,6 @@ def calculer_coupe_minimale(graph_data, residual, source):
 
 
 
-def dessiner_graphe(graph_data, debits):
-    """Visualise un flot déjà calculé sans recalculer l'algorithme."""
-    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
-    graph = nx.DiGraph()
-    for (source, destination), capacite in arcs.items():
-        graph.add_edge(source, destination, capacite=capacite)
-
-    pos = nx.spring_layout(graph, seed=42)
-    # Les arcs saturés sont dessinés en rouge et les autres en gris.
-    edge_colors = []
-    edge_widths = []
-    for edge in graph.edges:
-        capacite = graph[edge[0]][edge[1]]["capacite"]
-        if debits[edge] == capacite:
-            edge_colors.append("red")
-            edge_widths.append(3.0)
-        else:
-            edge_colors.append("gray")
-            edge_widths.append(1.2)
-
-    plt.figure(figsize=(9, 6))
-    nx.draw(
-        graph,
-        pos,
-        with_labels=True,
-        node_color="lightblue",
-        node_size=2500,
-        font_weight="bold",
-        arrowsize=20,
-        edge_color=edge_colors,
-        width=edge_widths,
-    )
-    # Chaque étiquette indique le débit actuel et la capacité de l'arc.
-    edge_labels = {}
-    for edge in graph.edges:
-        capacite = graph[edge[0]][edge[1]]["capacite"]
-        edge_labels[edge] = f"{debits[edge]}/{capacite}"
-    nx.draw_networkx_edge_labels(
-        graph, pos, edge_labels=edge_labels, font_color="darkblue"
-    )
-    plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
-    plt.show()
-
-
-
-
 def afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source, sink):
     """Affiche les résultats d'un calcul déjà effectué."""
     _, arcs, _, _ = extraire_donnees_graphe(graph_data)
@@ -586,6 +539,49 @@ def afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source,
         f"Conservation respectée : "
         f"{verification['conservation_respectee']}"
     )
+
+def dessiner_graphe(graph_data, debits):
+    """Visualise un flot déjà calculé sans recalculer l'algorithme."""
+    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
+    graph = nx.DiGraph()
+    for (source, destination), capacite in arcs.items():
+        graph.add_edge(source, destination, capacite=capacite)
+
+    pos = nx.spring_layout(graph, seed=42)
+    # Les arcs saturés sont dessinés en rouge et les autres en gris.
+    edge_colors = []
+    edge_widths = []
+    for edge in graph.edges:
+        capacite = graph[edge[0]][edge[1]]["capacite"]
+        if debits[edge] == capacite:
+            edge_colors.append("red")
+            edge_widths.append(3.0)
+        else:
+            edge_colors.append("gray")
+            edge_widths.append(1.2)
+
+    plt.figure(figsize=(9, 6))
+    nx.draw(
+        graph,
+        pos,
+        with_labels=True,
+        node_color="lightblue",
+        node_size=2500,
+        font_weight="bold",
+        arrowsize=20,
+        edge_color=edge_colors,
+        width=edge_widths,
+    )
+    # Chaque étiquette indique le débit actuel et la capacité de l'arc.
+    edge_labels = {}
+    for edge in graph.edges:
+        capacite = graph[edge[0]][edge[1]]["capacite"]
+        edge_labels[edge] = f"{debits[edge]}/{capacite}"
+    nx.draw_networkx_edge_labels(
+        graph, pos, edge_labels=edge_labels, font_color="darkblue"
+    )
+    plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
+    plt.show()
 
     
 def main():

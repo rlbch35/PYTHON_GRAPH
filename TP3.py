@@ -134,45 +134,6 @@ GraphData = dict[str, list[dict[str, int | str]]]
 Flow = dict[tuple[str, str], int]
 Residual = dict[tuple[str, str], int]
 
-def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
-    """Vérification contraintes capacités """
-    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
-    capacites_respectees = True # on initialise la variable à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes
-    # Aucun débit ne doit être négatif ni dépasser la capacité de son arc. on parcours tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc
-    for arc, capacite in arcs.items():
-        debit = debits[arc] # on récupère le débit de l'arc
-
-        # on vérifie que le débit est compris entre 0 et la capacité de l'arc
-        if debit < 0 or debit > capacite:
-            capacites_respectees = False # on met la variable à False si le débit ne respecte pas les contraintes
-            break
-    conservation_respectee = True
-
-
-    """Vérification contraintes conservation """
-    for node in sommets:
-        if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
-            continue
-
-        debit_entrant = 0 # on initialise le débit entrant à 0
-        for precedent in predecesseurs[node]: # on parcourt tous les sommets précédents du sommet courant
-            arc_entrant = (precedent, node) # on récupère l'arc entrant du sommet
-            debit_entrant += debits[arc_entrant] # on ajoute le débit de l'arc entrant au débit entrant total
-
-        debit_sortant = 0
-        for suivant in successeurs[node]: # on parcourt tous les sommets suivants du sommet courant
-            arc_sortant = (node, suivant) # on récupère l'arc sortant du sommet
-            debit_sortant += debits[arc_sortant] # on ajoute le débit de l'arc sortant au débit sortant total
-
-        if debit_entrant != debit_sortant: # on vérifie que le débit entrant est égal au débit sortant pour le sommet courant
-            conservation_respectee = False
-            break
-
-    verification = {}
-    verification["capacites_respectees"] = capacites_respectees
-    verification["conservation_respectee"] = conservation_respectee
-    return verification
-
 
 def bfs_predecesseurs(graphe, source, puit, residualCapacities):
     """
@@ -280,6 +241,44 @@ def calculer_flot(graph_data, source, puit):
 
     return debits, residual, valeur_totale_flot, source, puit # on retourne les débits, les capacités résiduelles, la valeur totale du flot, la source et le puits
 
+def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
+    """Vérification contraintes capacités """
+    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
+    capacites_respectees = True # on initialise la variable à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes
+    # Aucun débit ne doit être négatif ni dépasser la capacité de son arc. on parcours tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc
+    for arc, capacite in arcs.items():
+        debit = debits[arc] # on récupère le débit de l'arc
+
+        # on vérifie que le débit est compris entre 0 et la capacité de l'arc
+        if debit < 0 or debit > capacite:
+            capacites_respectees = False # on met la variable à False si le débit ne respecte pas les contraintes
+            break
+    conservation_respectee = True
+
+
+    """Vérification contraintes conservation """
+    for node in sommets:
+        if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
+            continue
+
+        debit_entrant = 0 # on initialise le débit entrant à 0
+        for precedent in predecesseurs[node]: # on parcourt tous les sommets précédents du sommet courant
+            arc_entrant = (precedent, node) # on récupère l'arc entrant du sommet
+            debit_entrant += debits[arc_entrant] # on ajoute le débit de l'arc entrant au débit entrant total
+
+        debit_sortant = 0
+        for suivant in successeurs[node]: # on parcourt tous les sommets suivants du sommet courant
+            arc_sortant = (node, suivant) # on récupère l'arc sortant du sommet
+            debit_sortant += debits[arc_sortant] # on ajoute le débit de l'arc sortant au débit sortant total
+
+        if debit_entrant != debit_sortant: # on vérifie que le débit entrant est égal au débit sortant pour le sommet courant
+            conservation_respectee = False
+            break
+
+    verification = {}
+    verification["capacites_respectees"] = capacites_respectees
+    verification["conservation_respectee"] = conservation_respectee
+    return verification
 
 def calculer_coupe_minimale(graph_data, residual, source):
     """ 
@@ -446,6 +445,50 @@ def desactiver_sommet(graph, sommet):
     return copie_graph
 
 
+def afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source, sink):
+    """Affiche les résultats d'un calcul déjà effectué."""
+    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
+    print("\n--- Débit final sur chaque arc ---")
+    for arc in arcs:
+        print(
+            f"f({arc[0]}, {arc[1]}) = {debits[arc]} "
+            f"/ capacité restante = {residual[arc]}"
+        )
+
+    print("\n--- Bilan final du flot ---")
+    print(f"Valeur totale du flot : {valeur_totale_flot}")
+
+    print("\n--- Débit f / capacité c sur chaque arc ---")
+    for arc, capacite in arcs.items():
+        print(
+            f"{arc[0]} -> {arc[1]} : "
+            f"f = {debits[arc]}, c = {capacite}, "
+            f"f/c = {debits[arc] / capacite:.2f}"
+        )
+
+    print("\n--- Arcs saturés ---")
+    arcs_satures = []
+    for arc, capacite in arcs.items():
+        if debits[arc] == capacite:
+            arcs_satures.append(arc)
+    if arcs_satures:
+        for arc in arcs_satures:
+            print(f"{arc[0]} -> {arc[1]}")
+    else:
+        print("Aucun arc saturé.")
+
+    verification = verifier_flot(graph_data, debits, source, sink)
+    print("\n--- Résultat des vérifications finales ---")
+    print(
+        "Contraintes de capacité respectées : "
+        f"{verification['capacites_respectees']}"
+    )
+    print(
+        f"Conservation respectée : "
+        f"{verification['conservation_respectee']}"
+    )
+
+
 
 def dessiner_graphe(graph_data, debits):
     """Visualise un flot déjà calculé sans recalculer l'algorithme."""
@@ -490,51 +533,6 @@ def dessiner_graphe(graph_data, debits):
     plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
     plt.show()
 
-
-
-
-def afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source, sink):
-    """Affiche les résultats d'un calcul déjà effectué."""
-    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
-    print("\n--- Débit final sur chaque arc ---")
-    for arc in arcs:
-        print(
-            f"f({arc[0]}, {arc[1]}) = {debits[arc]} "
-            f"/ capacité restante = {residual[arc]}"
-        )
-
-    print("\n--- Bilan final du flot ---")
-    print(f"Valeur totale du flot : {valeur_totale_flot}")
-
-    print("\n--- Débit f / capacité c sur chaque arc ---")
-    for arc, capacite in arcs.items():
-        print(
-            f"{arc[0]} -> {arc[1]} : "
-            f"f = {debits[arc]}, c = {capacite}, "
-            f"f/c = {debits[arc] / capacite:.2f}"
-        )
-
-    print("\n--- Arcs saturés ---")
-    arcs_satures = []
-    for arc, capacite in arcs.items():
-        if debits[arc] == capacite:
-            arcs_satures.append(arc)
-    if arcs_satures:
-        for arc in arcs_satures:
-            print(f"{arc[0]} -> {arc[1]}")
-    else:
-        print("Aucun arc saturé.")
-
-    verification = verifier_flot(graph_data, debits, source, sink)
-    print("\n--- Résultat des vérifications finales ---")
-    print(
-        "Contraintes de capacité respectées : "
-        f"{verification['capacites_respectees']}"
-    )
-    print(
-        f"Conservation respectée : "
-        f"{verification['conservation_respectee']}"
-    )
 
 
 def main():
