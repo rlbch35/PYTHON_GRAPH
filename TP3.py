@@ -1,8 +1,6 @@
 from TP1 import (
-    afficher_resultats,
-    calculer_coupe_minimale,
     calculer_flot,
-    dessiner_graphe,
+    etudier_scenario,
     extraire_donnees_graphe,
 )
 
@@ -132,47 +130,34 @@ graph_data_datacenter = {
 }
 
 
-GraphData = dict[str, list[dict[str, int | str]]]
-Flow = dict[tuple[str, str], int]
-Residual = dict[tuple[str, str], int]
-
-
 ### 4.3 Partie B Etape 3 Teste chaque liaison et retourne un tableau décroissant des impacts
+def desactiver_arc(graph_data, arc_source, arc_destination):
+    """Retourne une copie de graph_data où l'arc donné est désactivé."""
+    copie_graph = {}
+    for source, targets in graph_data.items():
+        copie_targets = []
+        for target in targets:
+            nouvelle_arete = dict(target)
+            if source == arc_source and target["to"] == arc_destination:
+                nouvelle_arete["enabled"] = False
+            copie_targets.append(nouvelle_arete)
+        copie_graph[source] = copie_targets
+    return copie_graph
+
+
 def classer_impacts(graph_data, source, puit):
-    """
-    Calcule l'impact individuel de chaque arête sur le flot maximal.
+    """Calcule l'impact de la suppression de chaque arc sur le flot maximal."""
+    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
+    _, _, performance_nominale, _, _ = calculer_flot(graph_data, source, puit)
 
-    Une arête est désactivée seule pour chaque essai. Les données originales
-    restent inchangées et chaque graphe testé est évalué directement.
-    """
-    etats_enabled = {}
-    for source_arc, targets in graph_data.items():
-        for target in targets:
-            etats_enabled[(source_arc, target["to"])] = target.get("enabled",True)
-            target["enabled"] = True
-
-    _, _, performance_nominale, _, _ = calculer_flot(graph_data,source,puit)
     impacts = []
-    for source_arc, targets in graph_data.items():
-        for target in targets:
-            destination_arc = target["to"]
-            target["enabled"] = False
-            _, _, performance_sans_arc, _, _ = calculer_flot(graph_data,source,puit)
-            impact = performance_nominale - performance_sans_arc
-            impacts.append(
-                (
-                    (source_arc, destination_arc),
-                    performance_sans_arc,
-                    impact
-                )
-            )
-            target["enabled"] = True
+    for arc in arcs:
+        graphe_sans_arc = desactiver_arc(graph_data, arc[0], arc[1])
+        _, _, performance_sans_arc, _, _ = calculer_flot(graphe_sans_arc, source, puit)
+        impact = performance_nominale - performance_sans_arc
+        impacts.append((arc, performance_sans_arc, impact))
 
-    for source_arc, targets in graph_data.items():
-        for target in targets:
-            target["enabled"] = etats_enabled[(source_arc, target["to"])]
-
-    impacts.sort(key=lambda resultat: resultat[2], reverse=True) # on trie la liste des impacts par ordre décroissant de l'impact
+    impacts.sort(key=lambda resultat: resultat[2], reverse=True)
     return impacts
 
 ## 4.4 Partie C Etape 4 test de connectivité
@@ -197,34 +182,21 @@ def dfs_connectivite(graph_data, sommet_depart):
 
 def etude_disable_connectivite(graph_data):
     """
-    Étudie l'impact de la désactivation individuelle de chaque arête
-    sur la connectivité (sommets accessibles) depuis chaque sommet du graphe.
+    Pour chaque sommet, désactive chaque arc un par un et retourne
+    les sommets qui ne sont plus accessibles depuis ce sommet.
     """
-    etats_enabled = {}
-    for source, targets in graph_data.items():
-        for target in targets:
-            etats_enabled[(source, target["to"])] = target.get("enabled", True)
-            target["enabled"] = True
-
-    sommets, _, _, _ = extraire_donnees_graphe(graph_data)
+    sommets, arcs, _, _ = extraire_donnees_graphe(graph_data)
     resultats = []
     for sommet in sommets:
         accessibles_avant = dfs_connectivite(graph_data, sommet)
-
-        for source, targets in graph_data.items():
-            for target in targets:
-                destination = target["to"]
-                target["enabled"] = False
-                accessibles_apres = dfs_connectivite(graph_data, sommet)
-                sommets_isoles = accessibles_avant - accessibles_apres
-                resultats.append((sommet, (source, destination), sommets_isoles))
-                # Restaurer l'état initial de l'arc (à l'intérieur de la boucle sur les arêtes)
-                target["enabled"] = True
-    # Restauration des états initiaux de graph_data
-    for source_arc, targets in graph_data.items():
-        for target in targets:
-            target["enabled"] = etats_enabled[(source_arc, target["to"])]
+        for arc in arcs:
+            graphe_sans_arc = desactiver_arc(graph_data, arc[0], arc[1])
+            accessibles_apres = dfs_connectivite(graphe_sans_arc, sommet)
+            sommets_isoles = accessibles_avant - accessibles_apres
+            resultats.append((sommet, arc, sommets_isoles))
     return resultats
+
+
 
 ### 4.5 Partie D 
 """Ajoutez la possibilité de désactiver un sommet et toutes ses arêtes incidentes. Testez la perte
@@ -243,8 +215,6 @@ def desactiver_sommet(graph, sommet):
         copie_targets = []
         for target in targets:
             nouvelle_arete = dict(target)
-            if "enabled" not in nouvelle_arete:
-                nouvelle_arete["enabled"] = True
             if arc_source == sommet or nouvelle_arete["to"] == sommet:
                 nouvelle_arete["enabled"] = False
             copie_targets.append(nouvelle_arete)
@@ -269,63 +239,13 @@ def main():
             f"impact = {impact}"
         )
 
-    ### graphe initial
-    debits, residual, valeur_totale_flot, source, puit = (
-        calculer_flot(graph_data, source, puit)
-    )
-    afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source, puit)
-    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph_data, residual, source))
+    ### graphe initial, puis R1-R3 désactivé, puis R3-Clients désactivé
+    for donnees in [graph_data, graph_data_R1R3disable, graph_data_R3Clidisable]:
+        etudier_scenario(donnees, source, puit)
 
-    print("\n--- Coupe minimale ---")
-    print(f"Ensemble A : {ensemble_A}")
-    print(f"Ensemble B : {ensemble_B}")
-
-    for arc in arcs_de_la_coupe:
-        print(f"{arc[0]} -> {arc[1]} " f"(capacité = {arc[2]})")
-
-    print(f"Capacité de la coupe : {capacite_de_la_coupe}")
-
-    dessiner_graphe(graph_data, debits)
-    
-    ## R1-R3 disable
-    debits, residual, valeur_totale_flot, source, puit = (
-        calculer_flot(graph_data_R1R3disable, source, puit)
-    )
-    afficher_resultats(graph_data_R1R3disable, debits, residual, valeur_totale_flot, source, puit)
-
-    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph_data_R1R3disable, residual, source))
-
-    print("\n--- Coupe minimale ---")
-    print(f"Ensemble A : {ensemble_A}")
-    print(f"Ensemble B : {ensemble_B}")
-
-    for arc in arcs_de_la_coupe:
-        print(f"{arc[0]} -> {arc[1]} " f"(capacité = {arc[2]})")
-
-    print(f"Capacité de la coupe : {capacite_de_la_coupe}")
-
-    dessiner_graphe(graph_data_R1R3disable, debits)
-
-    #R3-client disable
-    debits, residual, valeur_totale_flot, source, puit = ( calculer_flot(graph_data_R3Clidisable, source, puit))
-    afficher_resultats(graph_data_R3Clidisable, debits, residual, valeur_totale_flot, source, puit)
-    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph_data_R3Clidisable, residual, source))
-
-    print("\n--- Coupe minimale ---")
-    print(f"Ensemble A : {ensemble_A}")
-    print(f"Ensemble B : {ensemble_B}")
-
-    for arc in arcs_de_la_coupe:
-        print(f"{arc[0]} -> {arc[1]} " f"(capacité = {arc[2]})")
-
-    print(f"Capacité de la coupe : {capacite_de_la_coupe}")
-
-    dessiner_graphe(graph_data_R3Clidisable, debits)
-    
     dfs = dfs_connectivite(graph_data, "DC")
     print(f"{dfs}")
-    
-    
+
     resultats_connectivite = etude_disable_connectivite(graph_data)
     print("\n--- Étude de connectivité après désactivation d'arête, cas ou des sommet se retouve isolé ---")
     for sommet, arc, sommets_isoles in resultats_connectivite:

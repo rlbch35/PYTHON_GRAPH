@@ -4,26 +4,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-#### LES GRAPHES
-graph_data_etape1 = {
-    "DC-A": [
-        {"to":"R1","capacite": 120},
-        {"to":"R2","capacite": 100}
-    ],
-    "R1": [
-        {"to":"R3","capacite": 70},
-        {"to":"Zone-X","capacite": 40}
-    ],
-    "R2": [
-        {"to":"R3","capacite": 90},
-        {"to":"Zone-X","capacite": 30}
-    ],
-    "R3": [
-        {"to":"Zone-X","capacite": 140}
-    ]
-}
 
-# Structure du graphe
+# Structure du graphe pour la PARTIE C
 graph_data_C = {
     "S*": [
             {"to":"DC-LILLE","capacite": 420},
@@ -146,8 +128,7 @@ graph_data_C_add100_ROUtoREI = {
         ]
 }
 
-# Conclusion PARTIE D  Pour augmenter la valeur du flot maximal, il faut augmenter la valeur d'un arc de la coupe
-#=================================================================
+
 
 # ============================================================
 # ÉTAPE 1 - Représenter le graphe
@@ -155,9 +136,27 @@ graph_data_C_add100_ROUtoREI = {
 # Pour chaque sommet, on indique ses arcs sortants
 # et la capacité de chaque arc.
 
-def etape1et2(graph_data):
-
-    _, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
+def etape1et2():
+    
+    graph_data_etape1 = {
+    "DC-A": [
+        {"to":"R1","capacite": 120},
+        {"to":"R2","capacite": 100}
+    ],
+    "R1": [
+        {"to":"R3","capacite": 70},
+        {"to":"Zone-X","capacite": 40}
+    ],
+    "R2": [
+        {"to":"R3","capacite": 90},
+        {"to":"Zone-X","capacite": 30}
+    ],
+    "R3": [
+        {"to":"Zone-X","capacite": 140}
+    ]
+}
+    
+    _, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data_etape1)
 
     # Création du graphe orienté NetworkX uniquement pour l'affichage.
     G = nx.DiGraph()
@@ -240,43 +239,10 @@ def etape1et2(graph_data):
 
 
 ## ============================================================
-# PARTIE B
+# PARTIE B -  Construire progressivement un algorithme de flot
 ## ===========================================================
 
-def extraire_donnees_graphe(graph_data):
-    """
-    Extrait les structures Python pures utiles aux algorithmes à partir de
-    `graph_data`, en ne conservant que les arêtes actives (`enabled=True`).
-    """
-    sommets = set()
-    arcs = {}           # {(u, v): capacite}
-    successeurs = {}    # {u: [v, ...]}
-    predecesseurs = {}  # {v: [u, ...]}
-
-    for source, targets in graph_data.items(): # on parcourt tous les sommets du graphe
-        sommets.add(source) # on ajoute le sommet courant à l'ensemble des sommets
-        successeurs.setdefault(source, []) # on initialise la liste des successeurs du sommet courant si elle n'existe pas encore
-        predecesseurs.setdefault(source, []) # on initialise la liste des prédécesseurs du sommet courant si elle n'existe pas encore
-
-        for target in targets:
-            destination = target["to"] # on récupère le sommet destination de l'arc courant
-            sommets.add(destination) # on ajoute le sommet destination à l'ensemble des sommets
-            successeurs.setdefault(destination, []) # on initialise la liste des successeurs du sommet destination si elle n'existe pas encore
-            predecesseurs.setdefault(destination, []) # on initialise la liste des prédécesseurs du sommet destination si elle n'existe pas encore
-
-            if target.get("enabled", True): # on vérifie si l'arc est activé, par défaut il est activé
-                arcs[(source, destination)] = target["capacite"] # on ajoute l'arc courant à la liste des arcs avec sa capacité
-                successeurs[source].append(destination) # on ajoute le sommet destination à la liste des successeurs du sommet courant
-                predecesseurs[destination].append(source) # on ajoute le sommet courant à la liste des prédécesseurs du sommet destination
-
-    return sommets, arcs, successeurs, predecesseurs # on retourne l'ensemble des sommets, la liste des arcs avec leurs capacités, la liste des successeurs et la liste des prédécesseurs
-
-
-GraphData = dict[str, list[dict[str, int | str]]]
-Flow = dict[tuple[str, str], int]
-Residual = dict[tuple[str, str], int]
-
-def bfs_predecesseurs(graphe, source, puit, residualCapacities):
+def bfs_predecesseurs(source, puit, residualCapacities):
     """
     Recherche un chemin augmentant avec une recherche en largeur.
 
@@ -339,6 +305,40 @@ def bottleneck(path, residualCapacities):
 
     return plus_petite_capacite # on retourne la plus petite capacité résiduelle du chemin
 
+
+def extraire_donnees_graphe(graph_data):
+    """
+    Extrait les structures Python pures utiles aux algorithmes à partir de
+    `graph_data`, en ne conservant que les arêtes actives (`enabled=True`).
+    """
+    sommets = set()
+    arcs = {}           # {(u, v): capacite}
+    successeurs = {}    # {u: [v, ...]}
+    predecesseurs = {}  # {v: [u, ...]}
+
+    for source, targets in graph_data.items(): # on parcourt tous les sommets du graphe
+        sommets.add(source) # on ajoute le sommet courant à l'ensemble des sommets
+        successeurs.setdefault(source, []) # on initialise la liste des successeurs du sommet courant si elle n'existe pas encore
+        predecesseurs.setdefault(source, []) # on initialise la liste des prédécesseurs du sommet courant si elle n'existe pas encore
+
+        for target in targets:
+            destination = target["to"] # on récupère le sommet destination de l'arc courant
+            sommets.add(destination) # on ajoute le sommet destination à l'ensemble des sommets
+            successeurs.setdefault(destination, []) # on initialise la liste des successeurs du sommet destination si elle n'existe pas encore
+            predecesseurs.setdefault(destination, []) # on initialise la liste des prédécesseurs du sommet destination si elle n'existe pas encore
+
+            if target.get("enabled", True): # on vérifie si l'arc est activé, par défaut il est activé
+                arcs[(source, destination)] = target["capacite"] # on ajoute l'arc courant à la liste des arcs avec sa capacité
+                successeurs[source].append(destination) # on ajoute le sommet destination à la liste des successeurs du sommet courant
+                predecesseurs[destination].append(source) # on ajoute le sommet courant à la liste des prédécesseurs du sommet destination
+
+    return sommets, arcs, successeurs, predecesseurs # on retourne l'ensemble des sommets, la liste des arcs avec leurs capacités, la liste des successeurs et la liste des prédécesseurs
+
+
+Flow = dict[tuple[str, str], int]
+Residual = dict[tuple[str, str], int]
+
+
 def calculer_flot(graph_data, source, puit):
     """
     Calcule le flot maximal par augmentations successives des flots.
@@ -354,7 +354,7 @@ def calculer_flot(graph_data, source, puit):
         residual[(destination_arc, source_arc)] = 0 # on initialise la capacité résiduelle de chaque arc inverse à 0
         
     while True:
-        parent = bfs_predecesseurs(graph_data,source,puit,residual)
+        parent = bfs_predecesseurs(source,puit,residual)
         path = reconstruct_path(parent,source,puit) # on reconstruit le chemin à partir du dictionnaire des prédécesseurs
         if path is None:
             break
@@ -394,7 +394,6 @@ def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
             break
     conservation_respectee = True
 
-
     """Vérification contraintes conservation version 2 """
     for node in sommets:
         if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
@@ -414,10 +413,10 @@ def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
             conservation_respectee = False
             break
 
-    verification = {}
-    verification["capacites_respectees"] = capacites_respectees
-    verification["conservation_respectee"] = conservation_respectee
-    return verification
+    return {
+        "capacites_respectees": capacites_respectees,
+        "conservation_respectee": conservation_respectee,
+    }
 
 
 def calculer_coupe_minimale(graph_data, residual, source):
@@ -474,23 +473,17 @@ def calculer_coupe_minimale(graph_data, residual, source):
 def afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source, sink):
     """Affiche les résultats d'un calcul déjà effectué."""
     _, arcs, _, _ = extraire_donnees_graphe(graph_data)
-    print("\n--- Débit final sur chaque arc ---")
-    for arc in arcs:
-        print(
-            f"f({arc[0]}, {arc[1]}) = {debits[arc]} "
-            f"/ capacité restante = {residual[arc]}"
-        )
-
-    print("\n--- Bilan final du flot ---")
-    print(f"Valeur totale du flot : {valeur_totale_flot}")
-
     print("\n--- Débit f / capacité c sur chaque arc ---")
     for arc, capacite in arcs.items():
         print(
             f"{arc[0]} -> {arc[1]} : "
             f"f = {debits[arc]}, c = {capacite}, "
-            f"f/c = {debits[arc] / capacite:.2f}"
+            f"f/c = {debits[arc] / capacite:.2f}, "
+            f"capacité restante = {residual[arc]}"
         )
+
+    print("\n--- Bilan final du flot ---")
+    print(f"Valeur totale du flot : {valeur_totale_flot}")
 
     print("\n--- Arcs saturés ---")
     arcs_satures = []
@@ -523,10 +516,13 @@ def dessiner_graphe(graph_data, debits):
 
     pos = nx.spring_layout(graph, seed=42)
     # Les arcs saturés sont dessinés en rouge et les autres en gris.
+    # Chaque étiquette indique le débit actuel et la capacité de l'arc.
     edge_colors = []
     edge_widths = []
-    for edge in graph.edges:
-        capacite = graph[edge[0]][edge[1]]["capacite"]
+    edge_labels = {}
+    for edge in graph.edges: # on garde l'ordre de NetworkX pour que les couleurs correspondent aux bons arcs
+        capacite = arcs[edge]
+        edge_labels[edge] = f"{debits[edge]}/{capacite}"
         if debits[edge] == capacite:
             edge_colors.append("red")
             edge_widths.append(3.0)
@@ -546,41 +542,36 @@ def dessiner_graphe(graph_data, debits):
         edge_color=edge_colors,
         width=edge_widths,
     )
-    # Chaque étiquette indique le débit actuel et la capacité de l'arc.
-    edge_labels = {}
-    for edge in graph.edges:
-        capacite = graph[edge[0]][edge[1]]["capacite"]
-        edge_labels[edge] = f"{debits[edge]}/{capacite}"
     nx.draw_networkx_edge_labels(
         graph, pos, edge_labels=edge_labels, font_color="darkblue"
     )
     plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
     plt.show()
 
-    
-def main():
-    """Exécute le scénario complet : entrée, calcul, résultats, affichage."""
-    etape1et2(graph_data_etape1)
-    
-    
-    source = "S*"
-    puit = "T*"
-    debits, residual, valeur_totale_flot, source, puit = (calculer_flot(graph_data_C, source, puit))
-    afficher_resultats(graph_data_C, debits, residual, valeur_totale_flot, source, puit)
 
-    ## PARTIE D
-    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = (calculer_coupe_minimale(graph_data_C, residual, source))
-
+def afficher_coupe_minimale(graph_data, residual, source):
+    """Calcule puis affiche la coupe minimale (PARTIE D)."""
+    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = calculer_coupe_minimale(graph_data, residual, source)
     print("\n--- Coupe minimale ---")
     print(f"Ensemble A : {ensemble_A}")
     print(f"Ensemble B : {ensemble_B}")
-
     for arc in arcs_de_la_coupe:
-        print(f"{arc[0]} -> {arc[1]} " f"(capacité = {arc[2]})")
-
+        print(f"{arc[0]} -> {arc[1]} (capacité = {arc[2]})")
     print(f"Capacité de la coupe : {capacite_de_la_coupe}")
 
-    dessiner_graphe(graph_data_C, debits)
+
+def etudier_scenario(graph_data, source, puit):
+    """Calcule, affiche et dessine le flot maximal d'un graphe."""
+    debits, residual, valeur_totale_flot, _, _ = calculer_flot(graph_data, source, puit)
+    afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source, puit)
+    afficher_coupe_minimale(graph_data, residual, source)
+    dessiner_graphe(graph_data, debits)
+
+
+def main():
+    """Exécute le scénario complet : entrée, calcul, résultats, affichage."""
+    etape1et2()
+    etudier_scenario(graph_data_C, "S*", "T*")
 
 if __name__ == "__main__":
     main()
