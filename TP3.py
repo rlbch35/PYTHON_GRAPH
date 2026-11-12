@@ -2,7 +2,7 @@ from asyncio import graph
 
 import networkx as nx
 import matplotlib.pyplot as plt
-from TP1 import construire_graphe
+from TP1 import extraire_donnees_graphe
 
 #### LES GRAPHES
 graph_data= {
@@ -134,15 +134,13 @@ GraphData = dict[str, list[dict[str, int | str]]]
 Flow = dict[tuple[str, str], int]
 Residual = dict[tuple[str, str], int]
 
-def verifier_flot(graphe, debits, sourceNode, arriveeNode):
+def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
     """Vérification contraintes capacités """
+    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
     capacites_respectees = True # on initialise la variable à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes
     # Aucun débit ne doit être négatif ni dépasser la capacité de son arc. on parcours tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc
-    for arc in graphe.edges:
-        source_arc = arc[0] # on récupère le sommet source de l'arc
-        destination_arc = arc[1] # on récupère le sommet destination de l'arc
+    for arc, capacite in arcs.items():
         debit = debits[arc] # on récupère le débit de l'arc
-        capacite = graphe[source_arc][destination_arc]["capacite"] # on récupère la capacité de l'arc dans le graphe en entrée
 
         # on vérifie que le débit est compris entre 0 et la capacité de l'arc
         if debit < 0 or debit > capacite:
@@ -152,17 +150,17 @@ def verifier_flot(graphe, debits, sourceNode, arriveeNode):
 
 
     """Vérification contraintes conservation """
-    for node in graphe.nodes:
+    for node in sommets:
         if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
             continue
 
         debit_entrant = 0 # on initialise le débit entrant à 0
-        for precedent in graphe.predecessors(node): # on parcourt tous les sommets précédents du sommet courant
+        for precedent in predecesseurs[node]: # on parcourt tous les sommets précédents du sommet courant
             arc_entrant = (precedent, node) # on récupère l'arc entrant du sommet
             debit_entrant += debits[arc_entrant] # on ajoute le débit de l'arc entrant au débit entrant total
 
         debit_sortant = 0
-        for suivant in graphe.successors(node): # on parcourt tous les sommets suivants du sommet courant
+        for suivant in successeurs[node]: # on parcourt tous les sommets suivants du sommet courant
             arc_sortant = (node, suivant) # on récupère l'arc sortant du sommet
             debit_sortant += debits[arc_sortant] # on ajoute le débit de l'arc sortant au débit sortant total
 
@@ -241,26 +239,22 @@ def bottleneck(path, residualCapacities):
 
 
     
-def calculer_flot(graph, source, puit):
+def calculer_flot(graph_data, source, puit):
     """
     Calcule le flot maximal par augmentations successives des flots.
     Cette fonction ne fait aucun affichage et retourne uniquement le résultat
     du calcul.
     """
+    _, arcs, successeurs, _ = extraire_donnees_graphe(graph_data)
     debits: Flow = {} # on initialise le dictionnaire des débits comme un dictionnaire vide
-    for arc in graph.edges: # on parcourt tous les arcs du graphe
-        debits[arc] = 0 # on initialise le débit de chaque arc à 0
-
     residual: Residual = {} # on initialise le dictionnaire des capacités résiduelles comme un dictionnaire vide
-    for arc in graph.edges:
-        source_arc = arc[0]
-        destination_arc = arc[1]
-        capacite = graph[source_arc][destination_arc]["capacite"] # on récupère la capacité de l'arc dans le graphe en entrée
+    for (source_arc, destination_arc), capacite in arcs.items(): # on parcourt tous les arcs du graphe
+        debits[(source_arc, destination_arc)] = 0 # on initialise le débit de chaque arc à 0
         residual[(source_arc, destination_arc)] = capacite # on initialise la capacité résiduelle de chaque arc à sa capacité initiale
         residual[(destination_arc, source_arc)] = 0 # on initialise la capacité résiduelle de chaque arc inverse à 0
         
     while True:
-        parent = bfs_predecesseurs(graph,source,puit,residual)
+        parent = bfs_predecesseurs(graph_data,source,puit,residual)
         path = reconstruct_path(parent,source,puit) # on reconstruit le chemin à partir du dictionnaire des prédécesseurs
         if path is None:
             break
@@ -280,14 +274,14 @@ def calculer_flot(graph, source, puit):
             residual[arc_inverse] += quantite_a_ajouter # on ajoute la quantité à ajouter à la capacité résiduelle de l'arc inverse
 
     valeur_totale_flot = 0
-    for cible in graph.successors(source): # on parcourt tous les successeurs de la source pour calculer la valeur totale du flot
+    for cible in successeurs.get(source, []): # on parcourt tous les successeurs de la source pour calculer la valeur totale du flot
         arc = (source, cible) # on récupère l'arc sortant de la source vers le sommet cible
         valeur_totale_flot += debits[arc] # on ajoute les débits de l'arc sortant de la source à la valeur totale du flot
 
     return debits, residual, valeur_totale_flot, source, puit # on retourne les débits, les capacités résiduelles, la valeur totale du flot, la source et le puits
 
 
-def calculer_coupe_minimale(graph, residual, source):
+def calculer_coupe_minimale(graph_data, residual, source):
     """ 
     Détermine les ensembles A et B après le calcul du flot maximal.
 
@@ -296,6 +290,7 @@ def calculer_coupe_minimale(graph, residual, source):
 
     B contient tous les autres sommets.
     """
+    sommets, arcs, _, _ = extraire_donnees_graphe(graph_data)
     # Ensemble des sommets accessibles depuis la source.
     sommets_accessibles = {source}
     # File utilisée pour effectuer une exploration en largeur.
@@ -323,32 +318,16 @@ def calculer_coupe_minimale(graph, residual, source):
     # A contient les sommets accessibles.
     ensemble_A = sommets_accessibles
     # B contient les autres sommets du graphe original.
-    ensemble_B = set(graph.nodes) - ensemble_A #on utiliser set(graph.nodes) pour récupérer tous les sommets du graphe original et on soustrait l'ensemble des sommets accessibles
+    ensemble_B = sommets - ensemble_A
     
     arcs_de_la_coupe = [] # on initialise la liste des arcs de la coupe minimale comme une liste vide
     capacite_de_la_coupe = 0 # on initialise la capacité totale de la coupe minimale à 0
-    for arc in graph.edges:
-        sommet_depart = arc[0]
-        sommet_arrivee = arc[1]
+    for (sommet_depart, sommet_arrivee), capacite in arcs.items():
         if sommet_depart in ensemble_A and sommet_arrivee in ensemble_B: # on vérifie si le sommet départ est dans l'ensemble A et le sommet arrivée est dans l'ensemble B
-            capacite = graph[sommet_depart][sommet_arrivee]["capacite"] # on récupère la capacité de l'arc dans le graphe original
             arcs_de_la_coupe.append((sommet_depart, sommet_arrivee, capacite)) # on ajoute l'arc à la liste des arcs de la coupe minimale
             capacite_de_la_coupe += capacite # on ajoute la capacité de l'arc à la capacité totale de la coupe minimale
 
     return (ensemble_A,ensemble_B,arcs_de_la_coupe,capacite_de_la_coupe) # on retourne l'ensemble A, l'ensemble B, la liste des arcs de la coupe minimale et la capacité totale de la coupe minimale   
-
-
-def construire_graphe_option(graph_data: GraphData) -> nx.DiGraph:
-    """Construit un graphe NetworkX à partir des données d'entrée."""
-    graph = nx.DiGraph()
-    # Chaque entrée décrit un sommet de départ et ses arcs sortants.
-    for source, targets in graph_data.items():
-        for target in targets:
-            destination = target["to"]
-            capacite = target["capacite"]
-            if target["enabled"]: # on ne prends en compte que les arrete enabled, c'est bourrin mais ça marche, on peut se retourvé avec plusieurs départ ou arrivé
-                graph.add_edge(source, destination, capacite=capacite, enabled=True)
-    return graph
 
 
 ### 4.3 Partie B Etape 3 Teste chaque liaison et retourne un tableau décroissant des impacts
@@ -357,7 +336,7 @@ def classer_impacts(graph_data, source, puit):
     Calcule l'impact individuel de chaque arête sur le flot maximal.
 
     Une arête est désactivée seule pour chaque essai. Les données originales
-    restent inchangées et chaque graphe testé est reconstruit indépendamment.
+    restent inchangées et chaque graphe testé est évalué directement.
     """
     etats_enabled = {}
     for source_arc, targets in graph_data.items():
@@ -365,15 +344,13 @@ def classer_impacts(graph_data, source, puit):
             etats_enabled[(source_arc, target["to"])] = target.get("enabled",True)
             target["enabled"] = True
 
-    graphe_complet = construire_graphe_option(graph_data)
-    _, _, performance_nominale, _, _ = calculer_flot(graphe_complet,source,puit)
+    _, _, performance_nominale, _, _ = calculer_flot(graph_data,source,puit)
     impacts = []
     for source_arc, targets in graph_data.items():
         for target in targets:
             destination_arc = target["to"]
             target["enabled"] = False
-            graphe_sans_arc = construire_graphe_option(graph_data)
-            _, _, performance_sans_arc, _, _ = calculer_flot(graphe_sans_arc,source,puit)
+            _, _, performance_sans_arc, _, _ = calculer_flot(graph_data,source,puit)
             impact = performance_nominale - performance_sans_arc
             impacts.append(
                 (
@@ -388,7 +365,7 @@ def classer_impacts(graph_data, source, puit):
         for target in targets:
             target["enabled"] = etats_enabled[(source_arc, target["to"])]
 
-    impacts.sort(key=lambda resultat: resultat[2], reverse=True)
+    impacts.sort(key=lambda resultat: resultat[2], reverse=True) # on trie la liste des impacts par ordre décroissant de l'impact
     return impacts
 
 ## 4.4 Partie C Etape 4 test de connectivité
@@ -398,49 +375,43 @@ quels sommets sont accessibles depuis un sommet donné. Utilisez-le pour déterm
 suppression d une arête sépare le graphe utile en plusieurs composantes. Comparez cette notion
 avec l impact sur le flot.
 """
-def dfs_connectivite(graph, sommet_depart) :
-    visites =  {sommet_depart}
+def dfs_connectivite(graph_data, sommet_depart):
+    _, _, successeurs, _ = extraire_donnees_graphe(graph_data)
+    visites = {sommet_depart}
     pile = [sommet_depart]
     while pile:
         sommet_courant = pile.pop()
-        for voisin in graph.successors(sommet_courant):
+        for voisin in successeurs.get(sommet_courant, []):
             if voisin not in visites:
                 visites.add(voisin)
                 pile.append(voisin)
     return visites
 
 
-def etude_disable_connectivite(graph_data) :
+def etude_disable_connectivite(graph_data):
     """
     Étudie l'impact de la désactivation individuelle de chaque arête
     sur la connectivité (sommets accessibles) depuis chaque sommet du graphe.
     """
     etats_enabled = {}
     for source, targets in graph_data.items():
-        for target in targets :
+        for target in targets:
             etats_enabled[(source, target["to"])] = target.get("enabled", True)
             target["enabled"] = True
 
-    graphe_complet = construire_graphe_option(graph_data)
+    sommets, _, _, _ = extraire_donnees_graphe(graph_data)
     resultats = []
-    for sommet in graphe_complet.nodes:
-        accessibles_avant = dfs_connectivite(graphe_complet, sommet)
+    for sommet in sommets:
+        accessibles_avant = dfs_connectivite(graph_data, sommet)
 
         for source, targets in graph_data.items():
             for target in targets:
                 destination = target["to"]
                 target["enabled"] = False
-                graphe_arrete_desactive = construire_graphe_option(graph_data)
-                
-                if sommet in graphe_arrete_desactive:
-                    accessibles_apres = dfs_connectivite(graphe_arrete_desactive, sommet)
-                else:
-                    accessibles_apres = {sommet}
-                
-                sommet_isoles = accessibles_avant - accessibles_apres
+                accessibles_apres = dfs_connectivite(graph_data, sommet)
                 sommets_isoles = accessibles_avant - accessibles_apres
                 resultats.append((sommet, (source, destination), sommets_isoles))
-                # Restaurer e (à l'intérieur de la boucle sur les arêtes)
+                # Restaurer l'état initial de l'arc (à l'intérieur de la boucle sur les arêtes)
                 target["enabled"] = True
     # Restauration des états initiaux de graph_data
     for source_arc, targets in graph_data.items():
@@ -457,9 +428,8 @@ nécessaire."""
 
 def desactiver_sommet(graph, sommet):
     """
-    Crée une copie des données du graphe, désactive toutes les arêtes
-    incidentes (sortantes et entrantes) de `sommet`, puis construit et
-    retourne le graphe NetworkX correspondant.
+    Crée une copie des données du graphe et désactive toutes les arêtes
+    incidentes (sortantes et entrantes) de `sommet`.
     """
     copie_graph = {}
     for arc_source, targets in graph.items():
@@ -473,22 +443,23 @@ def desactiver_sommet(graph, sommet):
             copie_targets.append(nouvelle_arete)
         copie_graph[arc_source] = copie_targets
 
-    graphe_desactive = construire_graphe_option(copie_graph)
-    return graphe_desactive
+    return copie_graph
 
 
 
-
-def dessiner_graphe(graph, debits):
+def dessiner_graphe(graph_data, debits):
     """Visualise un flot déjà calculé sans recalculer l'algorithme."""
+    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
+    graph = nx.DiGraph()
+    for (source, destination), capacite in arcs.items():
+        graph.add_edge(source, destination, capacite=capacite)
+
     pos = nx.spring_layout(graph, seed=42)
     # Les arcs saturés sont dessinés en rouge et les autres en gris.
     edge_colors = []
     edge_widths = []
     for edge in graph.edges:
         capacite = graph[edge[0]][edge[1]]["capacite"]
-        if "enabled" in graph[edge[0]][edge[1]] and graph[edge[0]][edge[1]]["enabled"] == False:
-            continue
         if debits[edge] == capacite:
             edge_colors.append("red")
             edge_widths.append(3.0)
@@ -520,10 +491,13 @@ def dessiner_graphe(graph, debits):
     plt.show()
 
 
-def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink):
+
+
+def afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source, sink):
     """Affiche les résultats d'un calcul déjà effectué."""
+    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
     print("\n--- Débit final sur chaque arc ---")
-    for arc in graph.edges:
+    for arc in arcs:
         print(
             f"f({arc[0]}, {arc[1]}) = {debits[arc]} "
             f"/ capacité restante = {residual[arc]}"
@@ -533,8 +507,7 @@ def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink
     print(f"Valeur totale du flot : {valeur_totale_flot}")
 
     print("\n--- Débit f / capacité c sur chaque arc ---")
-    for arc in graph.edges:
-        capacite = graph[arc[0]][arc[1]]["capacite"]
+    for arc, capacite in arcs.items():
         print(
             f"{arc[0]} -> {arc[1]} : "
             f"f = {debits[arc]}, c = {capacite}, "
@@ -543,8 +516,7 @@ def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink
 
     print("\n--- Arcs saturés ---")
     arcs_satures = []
-    for arc in graph.edges:
-        capacite = graph[arc[0]][arc[1]]["capacite"]
+    for arc, capacite in arcs.items():
         if debits[arc] == capacite:
             arcs_satures.append(arc)
     if arcs_satures:
@@ -553,7 +525,7 @@ def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink
     else:
         print("Aucun arc saturé.")
 
-    verification = verifier_flot(graph, debits, source, sink)
+    verification = verifier_flot(graph_data, debits, source, sink)
     print("\n--- Résultat des vérifications finales ---")
     print(
         "Contraintes de capacité respectées : "
@@ -563,8 +535,6 @@ def afficher_resultats(graph, debits, residual, valeur_totale_flot, source, sink
         f"Conservation respectée : "
         f"{verification['conservation_respectee']}"
     )
-
-    
 
 
 def main():
@@ -584,12 +554,11 @@ def main():
         )
 
     ### graphe initial
-    graph = construire_graphe(graph_data)
     debits, residual, valeur_totale_flot, source, puit = (
-        calculer_flot(graph, source, puit)
+        calculer_flot(graph_data, source, puit)
     )
-    afficher_resultats(graph,debits, residual,valeur_totale_flot,source,puit)
-    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph,residual,source))
+    afficher_resultats(graph_data, debits, residual, valeur_totale_flot, source, puit)
+    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph_data, residual, source))
 
     print("\n--- Coupe minimale ---")
     print(f"Ensemble A : {ensemble_A}")
@@ -600,16 +569,15 @@ def main():
 
     print(f"Capacité de la coupe : {capacite_de_la_coupe}")
 
-    dessiner_graphe(graph, debits)
+    dessiner_graphe(graph_data, debits)
     
     ## R1-R3 disable
-    graph = construire_graphe_option(graph_data_R1R3disable)
     debits, residual, valeur_totale_flot, source, puit = (
-        calculer_flot(graph, source, puit)
+        calculer_flot(graph_data_R1R3disable, source, puit)
     )
-    afficher_resultats(graph,debits, residual,valeur_totale_flot,source,puit)
+    afficher_resultats(graph_data_R1R3disable, debits, residual, valeur_totale_flot, source, puit)
 
-    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph,residual,source))
+    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph_data_R1R3disable, residual, source))
 
     print("\n--- Coupe minimale ---")
     print(f"Ensemble A : {ensemble_A}")
@@ -620,13 +588,12 @@ def main():
 
     print(f"Capacité de la coupe : {capacite_de_la_coupe}")
 
-    dessiner_graphe(graph, debits)
+    dessiner_graphe(graph_data_R1R3disable, debits)
 
     #R3-client disable
-    graph = construire_graphe_option(graph_data_R3Clidisable)
-    debits, residual, valeur_totale_flot, source, puit = ( calculer_flot(graph, source, puit))
-    afficher_resultats(graph,debits, residual,valeur_totale_flot,source,puit)
-    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph,residual,source))
+    debits, residual, valeur_totale_flot, source, puit = ( calculer_flot(graph_data_R3Clidisable, source, puit))
+    afficher_resultats(graph_data_R3Clidisable, debits, residual, valeur_totale_flot, source, puit)
+    ensemble_A, ensemble_B, arcs_de_la_coupe, capacite_de_la_coupe = ( calculer_coupe_minimale(graph_data_R3Clidisable, residual, source))
 
     print("\n--- Coupe minimale ---")
     print(f"Ensemble A : {ensemble_A}")
@@ -637,10 +604,9 @@ def main():
 
     print(f"Capacité de la coupe : {capacite_de_la_coupe}")
 
-    dessiner_graphe(graph, debits)
+    dessiner_graphe(graph_data_R3Clidisable, debits)
     
-    graph = construire_graphe(graph_data)
-    dfs = dfs_connectivite(graph, "DC")
+    dfs = dfs_connectivite(graph_data, "DC")
     print(f"{dfs}")
     
     
