@@ -242,25 +242,43 @@ def etape1et2():
 # PARTIE B -  Construire progressivement un algorithme de flot
 ## ===========================================================
 
-def bfs_predecesseurs(source, puit, residualCapacities):
+def bfs_predecesseurs(source, puit, capacites_restantes):
     """
+    Retourne le dictionnaire des prédecesseurs ou None
+    en entrée : le sommet source, le sommet puit, un dictionnaire qui donne les valeurs de capcaité restantes et les inverses.
+    Pour graph_data_c, le retour :
+    {
+    "S*": None,           # la source n'a pas de prédécesseur
+    "DC-LILLE": "S*",
+    "DC-PARIS": "S*",
+    "LIL": "DC-LILLE",
+    "ROU": "DC-LILLE",
+    "PAR": "DC-PARIS",
+    "NORD-250": "LIL",
+    "REI": "ROU",
+    "IDF-430": "PAR",
+    "T*": "NORD-250"
+    }  
     Recherche un chemin augmentant avec une recherche en largeur.
 
     La recherche utilise le réseau résiduel. Elle peut donc parcourir :
     - des arcs originaux encore disponibles ;
     - des arcs inverses permettant d'annuler un flot déjà envoyé.
+    
+    Pourquoi construire ce dictionnaire des prédécesseurs ? 
+    Parce qu'il permet de reconstruire le chemin augmentant trouvé par la recherche en largeur.
     """
     parent = {source: None} # on initialise le dictionnaire des prédécesseurs avec la source comme clé et None comme valeur
     queue = [source] # on initialise la file d'attente avec la source comme premier élément
     while queue:
         node = queue.pop(0) # on récupère le premier élément de la file d'attente et on l'enlève de la file.
-        for arc in residualCapacities: # on parcourt tous les arcs du graphe résiduel
+        for arc in capacites_restantes: # on parcourt tous les arcs du graphe résiduel
             source_arc = arc[0]
             destination_arc = arc[1]
             
             if source_arc != node:# on ne considère que les arcs sortants du noeud courant
                 continue
-            capacite_restante = residualCapacities[arc] # on récupère la capacité résiduelle de l'arc dans le graphe résiduel
+            capacite_restante = capacites_restantes[arc] # on récupère la capacité résiduelle de l'arc dans le graphe résiduel
 
             if capacite_restante <= 0:# on ne considère que les arcs avec une capacité résiduelle positive
                 continue
@@ -273,7 +291,11 @@ def bfs_predecesseurs(source, puit, residualCapacities):
     return None
 
 def reconstruct_path(parent, source, puit):
-    """Reconstruit le chemin à partir du dictionnaire des prédécesseurs."""
+    """Reconstruit le chemin à partir du dictionnaire des prédécesseurs.
+    pourquoi reconstruire le chemin à partir du dictionnaire des prédécesseurs ?
+    Parce que le dictionnaire des prédécesseurs permet de retrouver le chemin augmentant trouvé par la recherche en largeur.
+    et bottleneck permet de trouver la plus petite capacité résiduelle de ce chemin.
+    on peut ensuite utiliser cette plus petite capacité résiduelle pour augmenter le flot."""
     if parent is None or puit not in parent:
         return None
     # Le chemin est reconstruit en partant du puits et en remontant jusqu'à la source grâce aux prédécesseurs.
@@ -290,20 +312,23 @@ def reconstruct_path(parent, source, puit):
     return path # on retourne le chemin reconstruit
 
 
-def bottleneck(path, residualCapacities):
-    """Retourne la plus petite capacité résiduelle du chemin."""
+def bottleneck(path, capacites_restantes):
+    """Retourne la plus petite capacité résiduelle du chemin.
+    en entrée : le chemin et un dictionnaire qui donne les valeurs de capcaité restantes et les inverses.
+    1. On initialise la plus petite capacité à la capacité résiduelle du premier arc du chemin.
+    2. On parcourt ensuite tous les arcs du chemin et on met à jour la plus petite capacité si on trouve une capacité résiduelle plus petite.
+    3. On retourne la plus petite capacité résiduelle du chemin.
+    """
     if len(path) == 0:
         return 0
-    # La capacité du premier arc est la première valeur de référence.
-    plus_petite_capacite = residualCapacities[path[0]]
+    plus_petite_capacite = capacites_restantes[path[0]]
 
-    # Chaque arc est ensuite comparé à cette valeur.
-    for arc in path: # on parcourt tous les arcs du chemin
-        capacite = residualCapacities[arc] # on récupère la capacité résiduelle de l'arc dans le graphe résiduel
-        if capacite < plus_petite_capacite: # on compare la capacité résiduelle de l'arc avec la plus petite capacité trouvée jusqu'à présent
-            plus_petite_capacite = capacite # on met à jour la plus petite capacité si la capacité résiduelle de l'arc est plus petite
+    for arc in path:
+        capacite = capacites_restantes[arc]
+        if capacite < plus_petite_capacite:
+            plus_petite_capacite = capacite
 
-    return plus_petite_capacite # on retourne la plus petite capacité résiduelle du chemin
+    return plus_petite_capacite
 
 
 def extraire_donnees_graphe(graph_data):
@@ -344,21 +369,29 @@ def calculer_flot(graph_data, source, puit):
     Calcule le flot maximal par augmentations successives des flots.
     Cette fonction ne fait aucun affichage et retourne uniquement le résultat
     du calcul.
+    On utilise la fonction bfs_predecesseurs pour trouver un chemin augmentant
+    la fonction reconstruct_path pour reconstruire le chemin à partir du dictionnaire des prédécesseurs
+    la fonction bottleneck pour trouver la plus petite capacité résiduelle du chemin augmentant.
+    1. On initialise le débit de chaque arc à 0 et la capacité résiduelle de chaque arc à sa capacité initiale.
+    2. On cherche un chemin augmentant dans le graphe résiduel.
+    3. Si on trouve un chemin augmentant, on calcule la quantité à ajouter au flot en utilisant la fonction bottleneck.
+    4. On met à jour le débit de chaque arc du chemin augmentant et la capacité résiduelle de chaque arc du chemin augmentant.
+    5. On répète les étapes 2 à 4 jusqu'à ce qu'il n'y ait plus de chemin augmentant.
     """
     _, arcs, successeurs, _ = extraire_donnees_graphe(graph_data)
     debits: Flow = {} # on initialise le dictionnaire des débits comme un dictionnaire vide
-    residual: Residual = {} # on initialise le dictionnaire des capacités résiduelles comme un dictionnaire vide
+    capacites_restantes: Residual = {} # on initialise le dictionnaire des capacités résiduelles comme un dictionnaire vide
     for (source_arc, destination_arc), capacite in arcs.items(): # on parcourt tous les arcs du graphe
         debits[(source_arc, destination_arc)] = 0 # on initialise le débit de chaque arc à 0
-        residual[(source_arc, destination_arc)] = capacite # on initialise la capacité résiduelle de chaque arc à sa capacité initiale
-        residual[(destination_arc, source_arc)] = 0 # on initialise la capacité résiduelle de chaque arc inverse à 0
+        capacites_restantes[(source_arc, destination_arc)] = capacite # on initialise la capacité résiduelle de chaque arc à sa capacité initiale
+        capacites_restantes[(destination_arc, source_arc)] = 0 # on initialise la capacité résiduelle de chaque arc inverse à 0
         
     while True:
-        parent = bfs_predecesseurs(source,puit,residual)
+        parent = bfs_predecesseurs(source,puit,capacites_restantes) # on cherche un chemin augmentant dans le graphe résiduel
         path = reconstruct_path(parent,source,puit) # on reconstruit le chemin à partir du dictionnaire des prédécesseurs
         if path is None:
             break
-        quantite_a_ajouter = bottleneck(path,residual) # on calcule la quantité à ajouter au flot en utilisant la fonction bottleneck
+        quantite_a_ajouter = bottleneck(path,capacites_restantes) # on calcule la quantité à ajouter au flot en utilisant la fonction bottleneck
         for arc in path: # on parcourt tous les arcs du chemin
             source_arc = arc[0]
             destination_arc = arc[1]
@@ -369,19 +402,26 @@ def calculer_flot(graph_data, source, puit):
             else:
                 arc_original = (destination_arc,source_arc)# on inverse l'arc pour retrouver l'arc original
                 debits[arc_original] -= quantite_a_ajouter # on soustrait la quantité à ajouter au débit de l'arc original inverse
-            residual[arc] -= quantite_a_ajouter # on soustrait la quantité à ajouter à la capacité résiduelle de l'arc
+            capacites_restantes[arc] -= quantite_a_ajouter # on soustrait la quantité à ajouter à la capacité résiduelle de l'arc
             arc_inverse = (destination_arc,source_arc) # on inverse l'arc pour retrouver l'arc inverse
-            residual[arc_inverse] += quantite_a_ajouter # on ajoute la quantité à ajouter à la capacité résiduelle de l'arc inverse
+            capacites_restantes[arc_inverse] += quantite_a_ajouter # on ajoute la quantité à ajouter à la capacité résiduelle de l'arc inverse
 
     valeur_totale_flot = 0
     for cible in successeurs.get(source, []): # on parcourt tous les successeurs de la source pour calculer la valeur totale du flot
         arc = (source, cible) # on récupère l'arc sortant de la source vers le sommet cible
         valeur_totale_flot += debits[arc] # on ajoute les débits de l'arc sortant de la source à la valeur totale du flot
 
-    return debits, residual, valeur_totale_flot, source, puit # on retourne les débits, les capacités résiduelles, la valeur totale du flot, la source et le puits
+    return debits, capacites_restantes, valeur_totale_flot, source, puit # on retourne les débits, les capacités résiduelles, la valeur totale du flot, la source et le puits
 
 def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
-    """Vérification contraintes capacités version 2 """
+    """Vérification contraintes capacités version 2 
+    1. On initialise la variable capacites_respectees à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes.
+    2. On parcourt tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc.
+    
+    Vérification contraintes conservation version 2
+    1. On initialise la variable conservation_respectee à True, on va la mettre à False si on trouve un sommet intermédiaire qui ne respecte pas les contraintes.
+    2. On parcourt tous les sommets du graphe et on vérifie que le débit entrant est égal au débit sortant pour chaque sommet intermédiaire.
+    """
     sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
     capacites_respectees = True # on initialise la variable à True, on va la mettre à False si on trouve un débit qui ne respecte pas les contraintes
     # Aucun débit ne doit être négatif ni dépasser la capacité de son arc. on parcours tous les arcs du graphe et on vérifie que le débit de chaque arc est compris entre 0 et la capacité de l'arc
@@ -398,12 +438,11 @@ def verifier_flot(graph_data, debits, sourceNode, arriveeNode):
     for node in sommets:
         if node in (sourceNode, arriveeNode): # on ne vérifie pas les sommets source et puits, on ne vérifie que les sommets intermédiaires
             continue
-
+        
         debit_entrant = 0 # on initialise le débit entrant à 0
         for precedent in predecesseurs[node]: # on parcourt tous les sommets précédents du sommet courant
             arc_entrant = (precedent, node) # on récupère l'arc entrant du sommet
             debit_entrant += debits[arc_entrant] # on ajoute le débit de l'arc entrant au débit entrant total
-
         debit_sortant = 0
         for suivant in successeurs[node]: # on parcourt tous les sommets suivants du sommet courant
             arc_sortant = (node, suivant) # on récupère l'arc sortant du sommet
@@ -428,6 +467,13 @@ def calculer_coupe_minimale(graph_data, residual, source):
     dans le réseau résiduel avec une capacité strictement positive.
 
     B contient tous les autres sommets.
+    1. On initialise l'ensemble des sommets accessibles avec la source.
+    2. On utilise une file pour effectuer une exploration en largeur à partir de la source.
+    3. Pour chaque sommet accessible, on parcourt tous les arcs du réseau résiduel et on ajoute les sommets accessibles à l'ensemble A.
+    4. On construit ensuite l'ensemble B avec tous les autres sommets du graphe.
+    5. On parcourt tous les arcs du graphe original et on ajoute les arcs de la coupe minimale à la liste des arcs de la coupe minimale.
+    6. On calcule la capacité totale de la coupe minimale en additionnant les capacités des arcs de la coupe minimale.
+    7. On retourne l'ensemble A, l'ensemble B, la liste des arcs de la coupe minimale et la capacité totale de la coupe minimale.
     """
     sommets, arcs, _, _ = extraire_donnees_graphe(graph_data)
     # Ensemble des sommets accessibles depuis la source.
