@@ -268,6 +268,17 @@ def analyser_desactivation_sommet(graph_data, sommet, source, puit):
         if recu < demande:
             zones_non_servies.append(f"{zone} ({recu}/{demande})")
     resultats["zones_non_servies"] = zones_non_servies
+    # 4. Taux maximal d'utilisation après reroutage
+    taux_max = 0
+    for u in graphe_sans_sommet:
+        for arete in graphe_sans_sommet[u]:
+            v = arete["to"]
+            cap = arete["capacite"]
+            if arete.get("enabled", True) and cap > 0:
+                taux = (debits.get((u, v), 0) / cap) * 100
+                if taux > taux_max:
+                    taux_max = taux
+    resultats["taux_max_utilisation"] = round(taux_max, 2)
     # 5. Calculer la nouvelle coupe minimale en passant bien `residual` et `source`
     _, _, arcs_coupe, capacite_coupe = calculer_coupe_minimale(graphe_sans_sommet, residual, source)
     resultats["arcs_coupe_minimale"] = arcs_coupe
@@ -300,12 +311,12 @@ def main():
     print(f"{dfs}")
 
     resultats_connectivite = etude_disable_connectivite(graph_data)
-    sommet_a_tester = [ "DC-LILLE","DC-PARIS","DC-LYON","LIL","PAR","LYO","REI","STR","NORD","IDF", "Sud-Est"]
+    sommet_a_tester = [ "DC-LILLE","DC-PARIS","DC-LYON","LIL","PAR","LYO","REI","STR"]
     for sommet in sommet_a_tester:
-        resultats_connectivite_dict = analyser_desactivation_sommet(graph_data_datacenter, sommet,"S*", "T*")
         print(f"\n--- Étude de connectivité graph_data_datacenter - Désactivation de {sommet} ---")
         resultats_connectivite_dict =  analyser_desactivation_sommet(graph_data_datacenter, sommet,"S*", "T*")
         print(f"Performance après désactivation de {sommet} : {resultats_connectivite_dict['performance_apres_desactivation']}")
+        print(f"Taux maximal d'utilisation : {resultats_connectivite_dict['taux_max_utilisation']}%")
         print(f"Zones non totalement servies : {resultats_connectivite_dict['zones_non_servies']}")
         print(f"Arcs de la coupe minimale : {resultats_connectivite_dict['arcs_coupe_minimale']}")
         print(f"Capacité de la coupe minimale : {resultats_connectivite_dict['capacite_coupe_minimale']}")
