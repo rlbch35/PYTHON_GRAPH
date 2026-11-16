@@ -1,0 +1,44 @@
+# Fonctions utilisées par les étapes suivantes
+def bfs_residual(graph, source, sink, residual):
+    """
+    Cherche un chemin entre source et sink avec une recherche en largeur.
+    """
+    parent = {source: None}
+    queue = [source]
+    while queue:
+        node = queue.pop(0) #On prends un élement de la queue
+        for (u, v), capacite in residual.items(): #Boucle qui teste le graphe résiduel
+            if u == node and capacite > 0: # Si le sommet départ et la capacité est disponible
+                voisin = v
+                if voisin not in parent:#ET si le sommet arrivé n'est pas dans les parents du sommet
+                    parent[voisin] = node#Alors on l'ajoute au tableau
+                    if voisin == sink:#Si c'est le puit on s'arrete
+                        return parent
+                    queue.append(voisin)
+    return None
+
+def reconstruct_path(parent, source, sink):
+    """Reconstruit le chemin à partir du dictionnaire des prédécesseurs."""
+    #On vérifie que le parent n'est pas vide et que le puit est dans parents
+    if parent is None or sink not in parent: 
+        return None
+    path = []
+    node = sink#On se place au puit
+    while node != source:#Tant que l'on est pas à la source
+        precedent = parent[node]#On récupère le parent du sommet
+        arc = (precedent, node)#On définit l'arrete entre les deux
+        path.append(arc)#Et on l'ajout au chemin
+        node = precedent#On remonte les sommets parents
+    path.reverse()#On inverse le chemin pour bien avoir le début vers la fin
+    return path
+
+def bottleneck(path, residual):
+    """Retourne la plus petite capacité résiduelle du chemin."""
+    if not path:
+        return 0
+    plus_petite_capacite = residual[path[0]]#On instancie la plus petite capacité avec la première valeur du chemin
+    for arc in path:#Pour chaque arc du chemin
+        capacite = residual[arc]#On instancie capacité avec la valeur de l'arrete dans le graphe résiduel
+        if capacite < plus_petite_capacite:#Si la capacité est plus petite alors
+            plus_petite_capacite = capacite#On redéfinie la valeur de capacité pour correspondre
+    return plus_petite_capacite

@@ -1,4 +1,4 @@
-from TP1 import (
+from Projet_main import (
     calculer_coupe_minimale,
     calculer_flot,
     etudier_scenario,
@@ -92,7 +92,7 @@ def etude_disable_connectivite(graph_data):
     for sommet in sommets:
         accessibles_avant = dfs_connectivite(graph_data, sommet)
         for arc in arcs:
-            graphe_sans_arc = desactiver_arc(graph_data, arc[0], arc[1])
+            graphe_sans_arc = desactiver_arc(graph_data, arc[0], arc[1])s=
             accessibles_apres = dfs_connectivite(graphe_sans_arc, sommet)
             sommets_isoles = accessibles_avant - accessibles_apres
             resultats.append((sommet, arc, sommets_isoles))
@@ -132,16 +132,17 @@ def analyser_desactivation_sommet(graph_data, sommet, source, puit):
     """
     Analyse l'impact de la désactivation d'un sommet sur le flot maximal,
     les zones servies, le taux d'utilisation et la coupe minimale.
+    1. On désactive le sommet et toutes ses arêtes incidentes.
+    2. On calcule le flot maximal du graphe modifié.
+    3. On détermine les zones non totalement servies en comparant le débit reçu avec la demande.
+    4. On calcule le taux maximal d'utilisation des arcs.
+    5. On calcule la coupe minimale du graphe modifié.
+    6. On retourne un dictionnaire contenant les résultats de l'analyse.
     """
     resultats = {}
-    # 1. Désactiver le sommet
     graphe_sans_sommet = desactiver_sommet(graph_data, sommet)
-
-    # 2. Calculer le flot après désactivation (on récupère debits et residual !)
     debits, residual, performance_apres, _, _ = calculer_flot(graphe_sans_sommet, source, puit)
     resultats["performance_apres_desactivation"] = performance_apres
-
-    # 3. Zones non totalement servies (les zones vers T* dont le débit n'atteint pas la demande)
     zones = ["NORD", "IDF", "Sud-Est"]
     zones_non_servies = []
     for zone in zones:
@@ -150,7 +151,6 @@ def analyser_desactivation_sommet(graph_data, sommet, source, puit):
         if recu < demande:
             zones_non_servies.append(f"{zone} ({recu}/{demande})")
     resultats["zones_non_servies"] = zones_non_servies
-    # 4. Taux maximal d'utilisation après reroutage
     taux_max = 0
     for u in graphe_sans_sommet:
         for arete in graphe_sans_sommet[u]:
@@ -161,7 +161,6 @@ def analyser_desactivation_sommet(graph_data, sommet, source, puit):
                 if taux > taux_max:
                     taux_max = taux
     resultats["taux_max_utilisation"] = round(taux_max, 2)
-    # 5. Calculer la nouvelle coupe minimale en passant bien `residual` et `source`
     _, _, arcs_coupe, capacite_coupe = calculer_coupe_minimale(graphe_sans_sommet, residual, source)
     resultats["arcs_coupe_minimale"] = arcs_coupe
     resultats["capacite_coupe_minimale"] = capacite_coupe
