@@ -1,0 +1,260 @@
+#### ============================================================
+#### FICHIER DÉDIÉ AUX GRAPHES (TP1 & TP3)
+#### ============================================================
+
+# ============================================================
+# GRAPHES POUR LE TP1
+# ============================================================
+
+# Structure du graphe pour la PARTIE C
+graph_data_C = {
+    "S*": [
+        {"to": "DC-LILLE", "capacite": 420},
+        {"to": "DC-PARIS", "capacite": 650}
+    ],
+    "DC-LILLE": [
+        {"to": "LIL", "capacite": 350},
+        {"to": "ROU", "capacite": 220}
+    ],
+    "DC-PARIS": [
+        {"to": "ROU", "capacite": 250},
+        {"to": "PAR", "capacite": 500}
+    ],
+    "LIL": [
+        {"to": "NORD-250", "capacite": 160},
+        {"to": "ROU", "capacite": 240}
+    ],
+    "PAR": [
+        {"to": "IDF-430", "capacite": 400},
+        {"to": "REI", "capacite": 320}
+    ],
+    "ROU": [
+        {"to": "PAR", "capacite": 280},
+        {"to": "REI", "capacite": 180}
+    ],
+    "REI": [
+        {"to": "IDF-430", "capacite": 100},
+        {"to": "EST-280", "capacite": 260}
+    ],
+    "NORD-250": [
+        {"to": "T*", "capacite": 250}
+    ],
+    "IDF-430": [
+        {"to": "T*", "capacite": 430}
+    ],
+    "EST-280": [
+        {"to": "T*", "capacite": 280}
+    ]
+}
+
+# ÉTAPE 6 : Scénario réflexion (+100 sur REI -> EST)
+graph_data_C_add100_REItoEST = {
+    "S*": [
+        {"to": "DC-LILLE", "capacite": 420},
+        {"to": "DC-PARIS", "capacite": 650}
+    ],
+    "DC-LILLE": [
+        {"to": "LIL", "capacite": 350},
+        {"to": "ROU", "capacite": 220}
+    ],
+    "DC-PARIS": [
+        {"to": "ROU", "capacite": 250},
+        {"to": "PAR", "capacite": 500}
+    ],
+    "LIL": [
+        {"to": "NORD-250", "capacite": 160},
+        {"to": "ROU", "capacite": 240}
+    ],
+    "PAR": [
+        {"to": "IDF-430", "capacite": 400},
+        {"to": "REI", "capacite": 320}
+    ],
+    "ROU": [
+        {"to": "PAR", "capacite": 280},
+        {"to": "REI", "capacite": 180}
+    ],
+    "REI": [
+        {"to": "IDF-430", "capacite": 100},
+        {"to": "EST-280", "capacite": 360}
+    ],
+    "NORD-250": [
+        {"to": "T*", "capacite": 250}
+    ],
+    "IDF-430": [
+        {"to": "T*", "capacite": 430}
+    ],
+    "EST-280": [
+        {"to": "T*", "capacite": 280}
+    ]
+}
+
+# ÉTAPE 6 : Scénario réflexion (+100 sur ROU -> REI)
+graph_data_C_add100_ROUtoREI = {
+    "S*": [
+        {"to": "DC-LILLE", "capacite": 420},
+        {"to": "DC-PARIS", "capacite": 650}
+    ],
+    "DC-LILLE": [
+        {"to": "LIL", "capacite": 350},
+        {"to": "ROU", "capacite": 220}
+    ],
+    "DC-PARIS": [
+        {"to": "ROU", "capacite": 250},
+        {"to": "PAR", "capacite": 500}
+    ],
+    "LIL": [
+        {"to": "NORD-250", "capacite": 160},
+        {"to": "ROU", "capacite": 240}
+    ],
+    "PAR": [
+        {"to": "IDF-430", "capacite": 400},
+        {"to": "REI", "capacite": 320}
+    ],
+    "ROU": [
+        {"to": "PAR", "capacite": 280},
+        {"to": "REI", "capacite": 280}
+    ],
+    "REI": [
+        {"to": "IDF-430", "capacite": 100},
+        {"to": "EST-280", "capacite": 260}
+    ],
+    "NORD-250": [
+        {"to": "T*", "capacite": 250}
+    ],
+    "IDF-430": [
+        {"to": "T*", "capacite": 430}
+    ],
+    "EST-280": [
+        {"to": "T*", "capacite": 280}
+    ]
+}
+
+
+# ============================================================
+# GRAPHES POUR LE TP3
+# ============================================================
+
+# Graphe simple initial de démonstration TP3
+graph_data = {
+    "DC": [
+        {"to": "R1", "capacite": 180},
+        {"to": "R2", "capacite": 180}
+    ],
+    "R1": [
+        {"to": "R3", "capacite": 140},
+        {"to": "R4", "capacite": 80}
+    ],
+    "R2": [
+        {"to": "R3", "capacite": 80},
+        {"to": "R4", "capacite": 140}
+    ],
+    "R3": [
+        {"to": "Clients", "capacite": 160}
+    ],
+    "R4": [
+        {"to": "Clients", "capacite": 160}
+    ]
+}
+
+# Débits initiaux pour TP3
+debits = {
+    ("DC", "R1"): 70,
+    ("DC", "R2"): 50,
+    ("R1", "R3"): 30,
+    ("R1", "R5"): 40,
+    ("R2", "R3"): 20,
+    ("R2", "R4"): 30,
+    ("R3", "Clients"): 50,
+    ("R4", "Clients"): 50
+}
+
+# Graphe TP3 avec l'arc R1 -> R3 désactivé
+graph_data_R1R3disable = {
+    "DC": [
+        {"to": "R1", "capacite": 180, "enabled": True},
+        {"to": "R2", "capacite": 180, "enabled": True}
+    ],
+    "R1": [
+        {"to": "R3", "capacite": 140, "enabled": False},
+        {"to": "R4", "capacite": 80, "enabled": True}
+    ],
+    "R2": [
+        {"to": "R3", "capacite": 80, "enabled": True},
+        {"to": "R4", "capacite": 140, "enabled": True}
+    ],
+    "R3": [
+        {"to": "Clients", "capacite": 160, "enabled": True}
+    ],
+    "R4": [
+        {"to": "Clients", "capacite": 160, "enabled": True}
+    ]
+}
+
+# Graphe TP3 avec l'arc R3 -> Clients désactivé
+graph_data_R3Clidisable = {
+    "DC": [
+        {"to": "R1", "capacite": 180, "enabled": True},
+        {"to": "R2", "capacite": 180, "enabled": True}
+    ],
+    "R1": [
+        {"to": "R3", "capacite": 140, "enabled": False},
+        {"to": "R4", "capacite": 80, "enabled": True}
+    ],
+    "R2": [
+        {"to": "R3", "capacite": 80, "enabled": True},
+        {"to": "R4", "capacite": 140, "enabled": True}
+    ],
+    "R3": [
+        {"to": "Clients", "capacite": 160, "enabled": False}
+    ],
+    "R4": [
+        {"to": "Clients", "capacite": 160, "enabled": True}
+    ]
+}
+
+# Réseau multi-datacenter complet (Partie D TP3)
+graph_data_datacenter = {
+    "S*": [
+        {"to": "DC-LILLE", "capacite": 350},
+        {"to": "DC-PARIS", "capacite": 500},
+        {"to": "DC-LYON", "capacite": 420}
+    ],
+    "DC-LILLE": [
+        {"to": "LIL", "capacite": 350}
+    ],
+    "DC-PARIS": [
+        {"to": "PAR", "capacite": 500}
+    ],
+    "DC-LYON": [
+        {"to": "LYO", "capacite": 420}
+    ],
+    "LIL": [
+        {"to": "REI", "capacite": 240},
+        {"to": "PAR", "capacite": 180}
+    ],
+    "PAR": [
+        {"to": "REI", "capacite": 320},
+        {"to": "STR", "capacite": 260},
+        {"to": "LYO", "capacite": 230}
+    ],
+    "LYO": [
+        {"to": "STR", "capacite": 230}
+    ],
+    "REI": [
+        {"to": "NORD", "capacite": 250},
+        {"to": "IDF", "capacite": 350}
+    ],
+    "STR": [
+        {"to": "Sud-Est", "capacite": 350},
+        {"to": "IDF", "capacite": 180}
+    ],
+    "NORD": [
+        {"to": "T*", "capacite": 250}
+    ],
+    "IDF": [
+        {"to": "T*", "capacite": 530}
+    ],
+    "Sud-Est": [
+        {"to": "T*", "capacite": 350}
+    ]
+}
