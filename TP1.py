@@ -335,6 +335,11 @@ def extraire_donnees_graphe(graph_data):
     """
     Extrait les structures Python pures utiles aux algorithmes à partir de
     `graph_data`, en ne conservant que les arêtes actives (`enabled=True`).
+    1. On initialise un ensemble pour les sommets, un dictionnaire pour les arcs avec leurs capacités, un dictionnaire pour les successeurs et un dictionnaire pour les prédécesseurs.
+    2. On parcourt tous les sommets du graphe et on ajoute chaque sommet à l'ensemble des sommets.
+    3. Pour chaque sommet, on parcourt tous ses arcs sortants et on ajoute chaque arc à la liste des arcs avec sa capacité, on ajoute le sommet destination à la liste des successeurs du sommet courant et on ajoute le sommet courant à la liste des prédécesseurs du sommet destination.
+    4. On retourne l'ensemble des sommets, la liste des arcs avec leurs capacités, la liste des successeurs et la liste des prédécesseurs.
+    5. On ne conserve que les arcs activés (`enabled=True`) pour le calcul du flot maximal.
     """
     sommets = set()
     arcs = {}           # {(u, v): capacite}
@@ -576,17 +581,7 @@ def dessiner_graphe(graph_data, debits):
             edge_widths.append(1.2)
 
     plt.figure(figsize=(9, 6))
-    nx.draw(
-        graph,
-        pos,
-        with_labels=True,
-        node_color="lightblue",
-        node_size=2500,
-        font_weight="bold",
-        arrowsize=20,
-        edge_color=edge_colors,
-        width=edge_widths,
-    )
+    nx.draw(graph,pos,with_labels=True,node_color="lightblue",node_size=2500,font_weight="bold",arrowsize=20,edge_color=edge_colors,width=edge_widths,)
     nx.draw_networkx_edge_labels(
         graph, pos, edge_labels=edge_labels, font_color="darkblue"
     )
