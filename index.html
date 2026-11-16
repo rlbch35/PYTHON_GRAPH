@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratoire Flot Maximal & Résilience Réseau (TP1 & TP3)</title>
+    <!-- Tailwind CSS pour un design moderne et responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PyScript 2024 (Pyodide avec NetworkX et Matplotlib) -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <style>
+        .tab-btn.active {
+            border-bottom: 3px solid #3b82f6;
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+        pre {
+            scrollbar-width: thin;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans">
+
+    <!-- En-tête -->
+    <header class="bg-indigo-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
+                    <span>🌐</span> Laboratoire d'Optimisation & Résilience Réseau
+                </h1>
+                <p class="text-indigo-200 text-sm mt-0.5">Banc d'essais interactif pour le TP1 (Flot Max / Coupe Min) et TP3 (Pannes N-1)</p>
+            </div>
+            <!-- Badge de statut PyScript -->
+            <div id="status-badge" class="flex items-center gap-2 bg-indigo-800/80 px-3 py-1.5 rounded-full border border-indigo-700 text-xs text-indigo-100">
+                <span class="animate-pulse inline-block w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                <span id="status-text">Initialisation de l'interpréteur Python...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation des Onglets -->
+    <nav class="bg-white border-b border-slate-200 shadow-sm sticky top-[73px] z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 text-sm">
+            <button onclick="switchTab('tp1')" id="tab-btn-tp1" class="tab-btn active py-4 px-2 text-slate-600 hover:text-indigo-600 transition">
+                🧪 TP1 : Flot Max & Coupe Minimale
+            </button>
+            <button onclick="switchTab('tp3')" id="tab-btn-tp3" class="tab-btn py-4 px-2 text-slate-600 hover:text-indigo-600 transition">
+                🛡️ TP3 : Analyse de Résilience & Pannes N-1
+            </button>
+            <button onclick="switchTab('tests')" id="tab-btn-tests" class="tab-btn py-4 px-2 text-slate-600 hover:text-indigo-600 transition">
+                ✅ Banc de Tests & Validation Globale
+            </button>
+        </div>
+    </nav>
+
+    <!-- Contenu Principal -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+
+        <!-- ============================================================ -->
+        <!-- ONGLET 1 : TP1 FLOT MAXIMAL & COUPE MINIMALE                -->
+        <!-- ============================================================ -->
+        <section id="tab-tp1" class="space-y-6">
+            <!-- Carte d'introduction TP1 -->
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Partie C : Algorithme d'Edmonds-Karp & Coupe Limitante</h2>
+                    <p class="text-slate-600 text-sm mt-1">Calcul du flot maximal sur le réseau fédérateur avec prise en compte des arcs inverses et détection des goulots.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button py-click="executer_tp1_nominal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow transition">
+                        Calculer Flot Nominal (Graphe C)
+                    </button>
+                    <button py-click="executer_tp1_scenario1" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium border border-slate-300 transition">
+                        +100 REI &rarr; EST
+                    </button>
+                    <button py-click="executer_tp1_scenario2" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium border border-slate-300 transition">
+                        +100 ROU &rarr; REI
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grille métriques + Visualisation TP1 -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Colonne Résultats Métriques -->
+                <div class="lg:col-span-1 space-y-4">
+                    <!-- Cartes indicateurs -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <span class="text-xs font-semibold uppercase text-slate-500">Flot Maximal</span>
+                            <div id="tp1-flot-valeur" class="text-2xl font-bold text-indigo-600 mt-1">- Gbps</div>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <span class="text-xs font-semibold uppercase text-slate-500">Capacité Coupe</span>
+                            <div id="tp1-coupe-valeur" class="text-2xl font-bold text-emerald-600 mt-1">- Gbps</div>
+                        </div>
+                    </div>
+
+                    <!-- Carte de validation mathématique -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Vérification des Contraintes</h3>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between items-center py-1 border-b border-slate-100">
+                                <span class="text-slate-600">Capacités (0 &le; f &le; c) :</span>
+                                <span id="tp1-verif-cap" class="font-medium text-slate-400">En attente</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-slate-100">
+                                <span class="text-slate-600">Conservation du flot :</span>
+                                <span id="tp1-verif-cons" class="font-medium text-slate-400">En attente</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1">
+                                <span class="text-slate-600">Égalité Flot-Max / Coupe-Min :</span>
+                                <span id="tp1-verif-egalite" class="font-medium text-slate-400">En attente</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Coupe minimale -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Arcs de la Coupe Minimale</h3>
+                        <div id="tp1-coupe-details" class="text-sm text-slate-600">
+                            Cliquez sur "Calculer Flot Nominal" pour afficher la coupe.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Colonne Graphique & Log TP1 -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Rendu Matplotlib -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Topologie & Flot Final (Rouge = Surchargé / Saturé)</h3>
+                        </div>
+                        <div id="tp1-plot-container" class="flex justify-center items-center min-h-[360px] bg-slate-50 rounded-lg border border-dashed border-slate-300 p-2 overflow-x-auto">
+                            <span class="text-slate-400 text-sm">Le graphe s'affichera ici lors de l'exécution.</span>
+                        </div>
+                    </div>
+
+                    <!-- Journal des chemins augmentants -->
+                    <div class="bg-slate-900 rounded-xl p-4 shadow-inner text-slate-100 text-xs font-mono">
+                        <div class="flex justify-between items-center mb-2 pb-2 border-b border-slate-800 text-slate-400 font-sans">
+                            <span class="font-bold">Journal d'exécution (Augmentations d'Edmonds-Karp)</span>
+                            <span id="tp1-log-count">0 chemin</span>
+                        </div>
+                        <pre id="tp1-log" class="max-h-56 overflow-y-auto whitespace-pre-wrap leading-relaxed text-emerald-400">En attente d'exécution...</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ============================================================ -->
+        <!-- ONGLET 2 : TP3 RÉSILIENCE & PANNES N-1                       -->
+        <!-- ============================================================ -->
+        <section id="tab-tp3" class="hidden space-y-6">
+            <!-- Contrôles TP3 -->
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 space-y-4">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Partie D : Simulateur de Pannes N-1 & Reroutage</h2>
+                        <p class="text-slate-600 text-sm mt-1">Analyse d'impact de la défaillance d'un Datacenter ou d'un Routeur central sur le réseau à 3 centres.</p>
+                    </div>
+                    <button py-click="executer_tp3_toutes_pannes" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow transition">
+                        📊 Simuler Tous les Équipements
+                    </button>
+                </div>
+
+                <!-- Sélecteur d'incident individuel -->
+                <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-3">
+                    <span class="text-sm font-semibold text-slate-700">Tester une panne unitaire :</span>
+                    
+                    <span class="text-xs uppercase font-bold text-indigo-700 ml-2">Datacenters :</span>
+                    <button py-click="simuler_panne_noeud" data-sommet="DC-LILLE" class="btn-panne bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1 rounded text-xs font-semibold transition">DC-LILLE</button>
+                    <button py-click="simuler_panne_noeud" data-sommet="DC-PARIS" class="btn-panne bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1 rounded text-xs font-semibold transition">DC-PARIS (Majeur)</button>
+                    <button py-click="simuler_panne_noeud" data-sommet="DC-LYON" class="btn-panne bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1 rounded text-xs font-semibold transition">DC-LYON</button>
+
+                    <span class="text-xs uppercase font-bold text-amber-700 ml-2">Routeurs :</span>
+                    <button py-click="simuler_panne_noeud" data-sommet="PAR" class="btn-panne bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1 rounded text-xs font-semibold transition">PAR (Critique)</button>
+                    <button py-click="simuler_panne_noeud" data-sommet="LIL" class="btn-panne bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1 rounded text-xs font-semibold transition">LIL</button>
+                    <button py-click="simuler_panne_noeud" data-sommet="LYO" class="btn-panne bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1 rounded text-xs font-semibold transition">LYO</button>
+                    <button py-click="simuler_panne_noeud" data-sommet="REI" class="btn-panne bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1 rounded text-xs font-semibold transition">REI</button>
+                    <button py-click="simuler_panne_noeud" data-sommet="STR" class="btn-panne bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1 rounded text-xs font-semibold transition">STR</button>
+                </div>
+            </div>
+
+            <!-- Focus Panne sélectionnée -->
+            <div id="tp3-focus-card" class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hidden">
+                <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                    <div>
+                        <span class="text-xs uppercase font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">Scénario de Panne N-1</span>
+                        <h3 id="tp3-focus-title" class="text-xl font-bold text-slate-900 mt-1">Désactivation de ...</h3>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-slate-500">Trafic nominal : 1050 Gbps</span>
+                        <div id="tp3-focus-flot" class="text-2xl font-bold text-red-600">- Gbps</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                    <div class="p-3 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-slate-500 font-semibold block">Taux d'utilisation max :</span>
+                        <span id="tp3-focus-taux" class="text-lg font-bold text-slate-800">-</span>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-slate-500 font-semibold block">Perte de trafic :</span>
+                        <span id="tp3-focus-perte" class="text-lg font-bold text-red-600">-</span>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-lg md:col-span-2">
+                        <span class="text-xs text-slate-500 font-semibold block">Zones non totalement servies :</span>
+                        <span id="tp3-focus-zones" class="text-sm font-medium text-amber-700">-</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-indigo-50/60 rounded-lg text-sm border border-indigo-100">
+                    <span class="font-semibold text-indigo-900">Nouvelle coupe limitante (goulots) :</span>
+                    <span id="tp3-focus-coupe" class="text-indigo-800 ml-1">-</span>
+                </div>
+            </div>
+
+            <!-- Tableau comparatif global -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex justify-between items-center">
+                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Tableau de Bord Comparatif des Pannes N-1</h3>
+                    <span class="text-xs text-slate-500 font-medium">Demande totale : 1130 Gbps (NORD 250, IDF 530, Sud-Est 350)</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead class="bg-slate-100 text-slate-700 text-xs font-semibold uppercase">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Équipement en panne</th>
+                                <th class="px-4 py-3 text-left">Rôle</th>
+                                <th class="px-4 py-3 text-center">Trafic Servi</th>
+                                <th class="px-4 py-3 text-center">Perte</th>
+                                <th class="px-4 py-3 text-left">Zones non totalement servies</th>
+                                <th class="px-4 py-3 text-center">Taux Max</th>
+                                <th class="px-4 py-3 text-left">Nouvelle Coupe Limitante</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tp3-table-body" class="divide-y divide-slate-100 text-slate-600">
+                            <tr>
+                                <td colspan="7" class="px-6 py-8 text-center text-slate-400">
+                                    Cliquez sur "Simuler Tous les Équipements" pour générer la synthèse.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Classement des impacts d'arcs (Partie B TP3) -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800">Partie B : Classement des Liaisons par Défaillance Critique</h3>
+                        <p class="text-xs text-slate-500">Test systématique de perte d'une liaison sur le réseau de base.</p>
+                    </div>
+                    <button py-click="executer_tp3_impacts_arcs" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded text-xs font-semibold border border-slate-300">
+                        Classer les Liaisons
+                    </button>
+                </div>
+                <div id="tp3-arcs-impacts" class="text-xs text-slate-600 font-mono">
+                    En attente d'exécution.
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ============================================================ -->
+        <!-- ONGLET 3 : BANC DE TESTS AUTOMATISÉS                         -->
+        <!-- ============================================================ -->
+        <section id="tab-tests" class="hidden space-y-6">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Banc de Validation Automatisée (Unit Tests)</h2>
+                    <p class="text-slate-600 text-sm mt-1">Exécute l'ensemble des validations mathématiques et scénarios de TP1 et TP3 en une passe.</p>
+                </div>
+                <button py-click="lancer_tous_les_tests" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow transition flex items-center gap-2">
+                    <span>▶️</span> Lancer la Suite Complète
+                </button>
+            </div>
+
+            <div id="tests-summary-card" class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hidden">
+                <div class="flex items-center gap-4">
+                    <div id="tests-badge-status" class="w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-emerald-100 text-emerald-700">
+                        ✓
+                    </div>
+                    <div>
+                        <h3 id="tests-headline" class="text-lg font-bold text-slate-900">Tous les tests ont réussi</h3>
+                        <p id="tests-subline" class="text-sm text-slate-500">0 test exécuté</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 rounded-xl p-5 shadow-inner text-slate-200 text-xs font-mono">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-800 text-slate-400 font-sans">
+                    <span class="font-bold">Rapport d'exécution des tests</span>
+                    <span id="tests-timestamp">-</span>
+                </div>
+                <div id="tests-log" class="space-y-1.5 max-h-96 overflow-y-auto leading-relaxed">
+                    <div class="text-slate-500">Cliquez sur "Lancer la Suite Complète" pour exécuter les assertions.</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Pied de page -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        Développé pour l'analyse des graphes, flots maximaux (Edmonds-Karp) et résilience d'infrastructure &bull; Exécuté via PyScript & Pyodide
+    </footer>
+
+    <!-- Script JavaScript pour la navigation des onglets -->
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.getElementById('tab-btn-' + tabId).classList.add('active');
+        }
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- CODE PYTHON COMPLET VIA PYSCRIPT                             -->
+    <!-- ============================================================ -->
+    <script type="py" config='{"packages": ["networkx", "matplotlib"]}'>
+import json
+from js import document
+import networkx as nx
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from pyscript import display, window
+
+# ==============================================================================
+# DONNÉES DES GRAPHES (TP1 & TP3)
+# ==============================================================================
+
+graph_data_C = {
+    "S*": [{"to": "DC-LILLE", "capacite": 420}, {"to": "DC-PARIS", "capacite": 650}],
+    "DC-LILLE": [{"to": "LIL", "capacite": 350}, {"to": "ROU", "capacite": 220}],
+    "DC-PARIS": [{"to": "ROU", "capacite": 250}, {"to": "PAR", "capacite": 500}],
+    "LIL": [{"to": "NORD-250", "capacite": 160}, {"to": "ROU", "capacite": 240}],
+    "PAR": [{"to": "IDF-430", "capacite": 400}, {"to": "REI", "capacite": 320}],
+    "ROU": [{"to": "PAR", "capacite": 280}, {"to": "REI", "capacite": 180}],
+    "REI": [{"to": "IDF-430", "capacite": 100}, {"to": "EST-280", "capacite": 260}],
+    "NORD-250": [{"to": "T*", "capacite": 250}],
+    "IDF-430": [{"to": "T*", "capacite": 430}],
+    "EST-280": [{"to": "T*", "capacite": 280}]
+}
+
+graph_data_C_add100_REItoEST = {
+    "S*": [{"to": "DC-LILLE", "capacite": 420}, {"to": "DC-PARIS", "capacite": 650}],
+    "DC-LILLE": [{"to": "LIL", "capacite": 350}, {"to": "ROU", "capacite": 220}],
+    "DC-PARIS": [{"to": "ROU", "capacite": 250}, {"to": "PAR", "capacite": 500}],
+    "LIL": [{"to": "NORD-250", "capacite": 160}, {"to": "ROU", "capacite": 240}],
+    "PAR": [{"to": "IDF-430", "capacite": 400}, {"to": "REI", "capacite": 320}],
+    "ROU": [{"to": "PAR", "capacite": 280}, {"to": "REI", "capacite": 180}],
+    "REI": [{"to": "IDF-430", "capacite": 100}, {"to": "EST-280", "capacite": 360}],
+    "NORD-250": [{"to": "T*", "capacite": 250}],
+    "IDF-430": [{"to": "T*", "capacite": 430}],
+    "EST-280": [{"to": "T*", "capacite": 280}]
+}
+
+graph_data_C_add100_ROUtoREI = {
+    "S*": [{"to": "DC-LILLE", "capacite": 420}, {"to": "DC-PARIS", "capacite": 650}],
+    "DC-LILLE": [{"to": "LIL", "capacite": 350}, {"to": "ROU", "capacite": 220}],
+    "DC-PARIS": [{"to": "ROU", "capacite": 250}, {"to": "PAR", "capacite": 500}],
+    "LIL": [{"to": "NORD-250", "capacite": 160}, {"to": "ROU", "capacite": 240}],
+    "PAR": [{"to": "IDF-430", "capacite": 400}, {"to": "REI", "capacite": 320}],
+    "ROU": [{"to": "PAR", "capacite": 280}, {"to": "REI", "capacite": 280}],
+    "REI": [{"to": "IDF-430", "capacite": 100}, {"to": "EST-280", "capacite": 260}],
+    "NORD-250": [{"to": "T*", "capacite": 250}],
+    "IDF-430": [{"to": "T*", "capacite": 430}],
+    "EST-280": [{"to": "T*", "capacite": 280}]
+}
+
+graph_data_datacenter = {
+    "S*": [
+        {"to": "DC-LILLE", "capacite": 350},
+        {"to": "DC-PARIS", "capacite": 500},
+        {"to": "DC-LYON", "capacite": 420}
+    ],
+    "DC-LILLE": [{"to": "LIL", "capacite": 350}],
+    "DC-PARIS": [{"to": "PAR", "capacite": 500}],
+    "DC-LYON": [{"to": "LYO", "capacite": 420}],
+    "LIL": [
+        {"to": "REI", "capacite": 240},
+        {"to": "PAR", "capacite": 180}
+    ],
+    "PAR": [
+        {"to": "REI", "capacite": 320},
+        {"to": "STR", "capacite": 260},
+        {"to": "LYO", "capacite": 230}
+    ],
+    "LYO": [{"to": "STR", "capacite": 230}],
+    "REI": [
+        {"to": "NORD", "capacite": 250},
+        {"to": "IDF", "capacite": 350}
+    ],
+    "STR": [
+        {"to": "Sud-Est", "capacite": 350},
+        {"to": "IDF", "capacite": 180}
+    ],
+    "NORD": [{"to": "T*", "capacite": 250}],
+    "IDF": [{"to": "T*", "capacite": 530}],
+    "Sud-Est": [{"to": "T*", "capacite": 350}]
+}
+
+graph_data_tp3_simple = {
+    "DC": [{"to": "R1", "capacite": 180}, {"to": "R2", "capacite": 180}],
+    "R1": [{"to": "R3", "capacite": 140}, {"to": "R4", "capacite": 80}],
+    "R2": [{"to": "R3", "capacite": 80}, {"to": "R4", "capacite": 140}],
+    "R3": [{"to": "Clients", "capacite": 160}],
+    "R4": [{"to": "Clients", "capacite": 160}]
+}
+
+pos_tp1 = {
+    'S*': (0, 1), 'DC-LILLE': (2, 2), 'DC-PARIS': (2, 0),
+    'LIL': (4, 2), 'ROU': (4, 1), 'PAR': (6, 1), 'REI': (6, 0),
+    'NORD-250': (8, 2), 'IDF-430': (8, 1), 'EST-280': (8, 0), 'T*': (10, 1)
+}
+
+# ==============================================================================
+# ALGORITHMES COEUR (EDMONDS-KARP, COUPE MIN, DÉSACTIVATIONS)
+# ==============================================================================
+
+def bfs_residual(graph, source, sink, residual):
+    parent = {source: None}
+    queue = [source]
+    while queue:
+        node = queue.pop(0)
+        voisins = graph.successors(node)
+        for voisin in voisins:
+            arc = (node, voisin)
+            sommet_deja_visite = voisin in parent
+            capacite_restante = residual.get(arc, 0)
+            arc_utilisable = capacite_restante > 0
+            if not sommet_deja_visite and arc_utilisable:
+                parent[voisin] = node
+                if voisin == sink:
+                    return parent
+                queue.append(voisin)
+    return None
+
+def reconstruct_path(parent, source, sink):
+    if parent is None or sink not in parent:
+        return None
+    path = []
+    node = sink
+    while node != source:
+        precedent = parent[node]
+        path.append((precedent, node))
+        node = precedent
+    path.reverse()
+    return path
+
+def bottleneck(path, residual):
+    if not path:
+        return 0
+    plus_petite_capacite = residual[path[0]]
+    for arc in path:
+        cap = residual[arc]
+        if cap < plus_petite_capacite:
+            plus_petite_capacite = cap
+    return plus_petite_capacite
+
+def calculer_flot(graph_data, source, sink):
+    G = nx.DiGraph()
+    debits = {}
+    residual = {}
+    for source_sommet, cibles in graph_data.items():
+        for arete in cibles:
+            if arete.get("enabled", True):
+                dest = arete["to"]
+                cap = arete["capacite"]
+                G.add_edge(source_sommet, dest, capacite=cap)
+                if not G.has_edge(dest, source_sommet):
+                    G.add_edge(dest, source_sommet, capacite=0)
+                debits[(source_sommet, dest)] = 0
+                residual[(source_sommet, dest)] = cap
+                residual[(dest, source_sommet)] = 0
+
+    journal_chemins = []
+    num = 1
+    while True:
+        parent = bfs_residual(G, source, sink, residual)
+        path = reconstruct_path(parent, source, sink)
+        if path is None:
+            break
+        quantite = bottleneck(path, residual)
+        journal_chemins.append((num, path, quantite))
+        for arc in path:
+            u, v = arc
+            if arc in debits:
+                debits[arc] += quantite
+            else:
+                debits[(v, u)] -= quantite
+            residual[arc] -= quantite
+            residual[(v, u)] += quantite
+        num += 1
+
+    flot_total = sum(debits.get((source, a["to"]), 0) for a in graph_data.get(source, []) if a.get("enabled", True))
+    return debits, residual, flot_total, journal_chemins
+
+def verifier_flot(graph_data, debits, source, sink):
+    capacites_ok = True
+    debits_entrants = {}
+    debits_sortants = {}
+    tous_sommets = set(graph_data.keys())
+
+    for u, cibles in graph_data.items():
+        for arete in cibles:
+            if arete.get("enabled", True):
+                v = arete["to"]
+                cap = arete["capacite"]
+                debit = debits.get((u, v), 0)
+                tous_sommets.add(v)
+                if debit < 0 or debit > cap:
+                    capacites_ok = False
+                debits_sortants[u] = debits_sortants.get(u, 0) + debit
+                debits_entrants[v] = debits_entrants.get(v, 0) + debit
+
+    conservation_ok = True
+    for node in tous_sommets:
+        if node in (source, sink):
+            continue
+        if debits_entrants.get(node, 0) != debits_sortants.get(node, 0):
+            conservation_ok = False
+            break
+
+    return {"capacites": capacites_ok, "conservation": conservation_ok}
+
+def calculer_coupe_minimale(graph_data, residual, source):
+    sommets_accessibles = {source}
+    queue = [source]
+    while queue:
+        u = queue.pop(0)
+        for arc, cap_restante in residual.items():
+            if arc[0] == u and cap_restante > 0 and arc[1] not in sommets_accessibles:
+                sommets_accessibles.add(arc[1])
+                queue.append(arc[1])
+
+    ensemble_A = sommets_accessibles
+    tous_sommets = set(graph_data.keys())
+    for cibles in graph_data.values():
+        for arete in cibles:
+            tous_sommets.add(arete["to"])
+    ensemble_B = tous_sommets - ensemble_A
+
+    arcs_coupe = []
+    cap_coupe = 0
+    for u, cibles in graph_data.items():
+        for arete in cibles:
+            if arete.get("enabled", True):
+                v = arete["to"]
+                cap = arete["capacite"]
+                if u in ensemble_A and v in ensemble_B:
+                    arcs_coupe.append((u, v, cap))
+                    cap_coupe += cap
+
+    return ensemble_A, ensemble_B, arcs_coupe, cap_coupe
+
+def desactiver_sommet(graph, sommet):
+    copie = {}
+    for u, cibles in graph.items():
+        nouvelles_cibles = []
+        for target in cibles:
+            copie_arete = dict(target)
+            if u == sommet or copie_arete["to"] == sommet:
+                copie_arete["enabled"] = False
+            nouvelles_cibles.append(copie_arete)
+        copie[u] = nouvelles_cibles
+    return copie
+
+def desactiver_arc(graph, u_arc, v_arc):
+    copie = {}
+    for u, cibles in graph.items():
+        nouvelles_cibles = []
+        for target in cibles:
+            copie_arete = dict(target)
+            if u == u_arc and target["to"] == v_arc:
+                copie_arete["enabled"] = False
+            nouvelles_cibles.append(copie_arete)
+        copie[u] = nouvelles_cibles
+    return copie
+
+def analyser_desactivation_sommet(graph, sommet, source="S*", puit="T*"):
+    graphe_sans = desactiver_sommet(graph, sommet)
+    debits, residual, flot, _ = calculer_flot(graphe_sans, source, puit)
+
+    zones = ["NORD", "IDF", "Sud-Est"]
+    zones_non_servies = []
+    for z in zones:
+        demande = graph[z][0]["capacite"]
+        recu = debits.get((z, puit), 0)
+        if recu < demande:
+            zones_non_servies.append(f"{z} ({recu}/{demande})")
+
+    # Taux max d'utilisation
+    taux_max = 0.0
+    for u, cibles in graphe_sans.items():
+        for arete in cibles:
+            if arete.get("enabled", True):
+                v = arete["to"]
+                cap = arete["capacite"]
+                if cap > 0:
+                    taux = (debits.get((u, v), 0) / cap) * 100
+                    if taux > taux_max:
+                        taux_max = taux
+
+    ensA, ensB, arcs_coupe, cap_coupe = calculer_coupe_minimale(graphe_sans, residual, source)
+    return {
+        "sommet": sommet,
+        "flot": flot,
+        "zones_non_servies": zones_non_servies,
+        "taux_max": round(taux_max, 1),
+        "arcs_coupe": arcs_coupe,
+        "cap_coupe": cap_coupe
+    }
+
+# ==============================================================================
+# FONCTIONS D'INTERFACE UTILISATEUR & ÉVÉNEMENTS
+# ==============================================================================
+
+def executer_tp1(graphe, nom="Graphe Nominal"):
+    debits, residual, flot, logs = calculer_flot(graphe, "S*", "T*")
+    ensA, ensB, arcs_coupe, cap_coupe = calculer_coupe_minimale(graphe, residual, "S*")
+    verif = verifier_flot(graphe, debits, "S*", "T*")
+
+    document.getElementById("tp1-flot-valeur").innerText = f"{flot} Gbps"
+    document.getElementById("tp1-coupe-valeur").innerText = f"{cap_coupe} Gbps"
+
+    # Vérifications
+    c_ok = "✓ Valide" if verif["capacites"] else "✗ Non respecté"
+    cons_ok = "✓ Conservé" if verif["conservation"] else "✗ Violation"
+    egal_ok = "✓ Vérifié (Max=Min)" if flot == cap_coupe else "✗ Différence"
+
+    document.getElementById("tp1-verif-cap").innerHTML = f"<span class='text-emerald-600 font-bold'>{c_ok}</span>"
+    document.getElementById("tp1-verif-cons").innerHTML = f"<span class='text-emerald-600 font-bold'>{cons_ok}</span>"
+    document.getElementById("tp1-verif-egalite").innerHTML = f"<span class='text-emerald-600 font-bold'>{egal_ok}</span>"
+
+    # Coupe détails
+    html_coupe = "<ul class='space-y-1'>"
+    for u, v, c in arcs_coupe:
+        html_coupe += f"<li><span class='font-mono font-bold text-red-600'>{u} &rarr; {v}</span> (capacité: {c} Gbps)</li>"
+    html_coupe += f"</ul><p class='mt-2 text-xs text-slate-500 font-semibold'>Sommets accessibles (A) : {', '.join(sorted(ensA))}</p>"
+    document.getElementById("tp1-coupe-details").innerHTML = html_coupe
+
+    # Logs
+    log_text = f"=== Exécution {nom} ===\n"
+    for num, path, quant in logs:
+        p_str = " -> ".join([p[0] for p in path] + [path[-1][1]])
+        log_text += f"[Chemin #{num}] {p_str} | +{quant} Gbps\n"
+    log_text += f"\nFlot total final : {flot} Gbps\nCapacité de coupe : {cap_coupe} Gbps"
+    document.getElementById("tp1-log").innerText = log_text
+    document.getElementById("tp1-log-count").innerText = f"{len(logs)} chemins augmentants"
+
+    # Rendu Graphique Matplotlib
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(9, 5))
+    G = nx.DiGraph()
+    for u, cibles in graphe.items():
+        for arete in cibles:
+            if arete.get("enabled", True):
+                G.add_edge(u, arete["to"], capacite=arete["capacite"])
+
+    edge_colors = ['#dc2626' if debits.get(e, 0) == G[e[0]][e[1]]['capacite'] else '#94a3b8' for e in G.edges]
+    edge_widths = [3.0 if debits.get(e, 0) == G[e[0]][e[1]]['capacite'] else 1.2 for e in G.edges]
+    edge_labels = {e: f"{debits.get(e, 0)}/{G[e[0]][e[1]]['capacite']}" for e in G.edges}
+
+    nx.draw(
+        G, pos_tp1, ax=ax, with_labels=True, node_color='#e0e7ff',
+        node_size=2000, font_weight='bold', font_size=8, arrowsize=15,
+        edge_color=edge_colors, width=edge_widths
+    )
+    nx.draw_networkx_edge_labels(G, pos_tp1, edge_labels=edge_labels, ax=ax, font_color='#1e3a8a', font_size=7)
+    ax.set_title(f"{nom} : Flot Final {flot} Gbps (Arcs saturés en rouge)", fontsize=11, fontweight='bold', pad=10)
+
+    target_div = document.getElementById("tp1-plot-container")
+    target_div.innerHTML = ""
+    display(fig, target="tp1-plot-container")
+
+def executer_tp1_nominal(event=None):
+    executer_tp1(graph_data_C, "Scénario Nominal (Graphe C)")
+
+def executer_tp1_scenario1(event=None):
+    executer_tp1(graph_data_C_add100_REItoEST, "Scénario +100 sur REI -> EST")
+
+def executer_tp1_scenario2(event=None):
+    executer_tp1(graph_data_C_add100_ROUtoREI, "Scénario +100 sur ROU -> REI")
+
+# ==============================================================================
+# TP3 : RÉSILIENCE ET PANNES
+# ==============================================================================
+
+def simuler_panne_noeud(event):
+    sommet = event.target.getAttribute("data-sommet")
+    res = analyser_desactivation_sommet(graph_data_datacenter, sommet)
+
+    focus_card = document.getElementById("tp3-focus-card")
+    focus_card.classList.remove("hidden")
+
+    document.getElementById("tp3-focus-title").innerText = f"Panne de l'équipement : {sommet}"
+    document.getElementById("tp3-focus-flot").innerText = f"{res['flot']} Gbps"
+    document.getElementById("tp3-focus-perte").innerText = f"-{1050 - res['flot']} Gbps"
+    document.getElementById("tp3-focus-taux").innerText = f"{res['taux_max']}%"
+
+    zones_txt = ", ".join(res["zones_non_servies"]) if res["zones_non_servies"] else "Toutes servies à 100%"
+    document.getElementById("tp3-focus-zones").innerText = zones_txt
+
+    coupe_txt = " + ".join([f"{u}->{v} ({c})" for u, v, c in res["arcs_coupe"]])
+    document.getElementById("tp3-focus-coupe").innerText = f"{coupe_txt} = {res['cap_coupe']} Gbps"
+
+def executer_tp3_toutes_pannes(event=None):
+    sommet_liste = [
+        ("DC-LILLE", "Datacenter"), ("DC-PARIS", "Datacenter (Majeur)"), ("DC-LYON", "Datacenter"),
+        ("PAR", "Routeur (Hub Central)"), ("LIL", "Routeur"), ("LYO", "Routeur"),
+        ("REI", "Routeur"), ("STR", "Routeur")
+    ]
+    html_rows = ""
+    for sommet, role in sommet_liste:
+        res = analyser_desactivation_sommet(graph_data_datacenter, sommet)
+        perte = 1050 - res["flot"]
+        perte_badge = f"<span class='text-red-600 font-bold'>-{perte} Gbps</span>" if perte > 0 else "<span class='text-emerald-600 font-bold'>0</span>"
+        zones = "<br>".join(res["zones_non_servies"]) if res["zones_non_servies"] else "<span class='text-emerald-600 font-medium'>Aucune (100% servies)</span>"
+        coupe = ", ".join([f"{u}->{v}" for u, v, _ in res["arcs_coupe"]])
+
+        is_critical = "bg-red-50/70" if perte >= 400 else ""
+        html_rows += f"""
+        <tr class='hover:bg-slate-50 transition {is_critical}'>
+            <td class='px-4 py-3 font-mono font-bold text-slate-800'>{sommet}</td>
+            <td class='px-4 py-3 text-xs text-slate-500'>{role}</td>
+            <td class='px-4 py-3 text-center font-bold text-slate-900'>{res['flot']} Gbps</td>
+            <td class='px-4 py-3 text-center'>{perte_badge}</td>
+            <td class='px-4 py-3 text-xs'>{zones}</td>
+            <td class='px-4 py-3 text-center font-semibold text-slate-700'>{res['taux_max']}%</td>
+            <td class='px-4 py-3 text-xs font-mono text-slate-600'>{coupe} ({res['cap_coupe']} Gbps)</td>
+        </tr>
+        """
+    document.getElementById("tp3-table-body").innerHTML = html_rows
+
+def executer_tp3_impacts_arcs(event=None):
+    _, _, perf_nom, _ = calculer_flot(graph_data_tp3_simple, "DC", "Clients")
+    impacts = []
+    for u, cibles in graph_data_tp3_simple.items():
+        for arete in cibles:
+            v = arete["to"]
+            g_sans = desactiver_arc(graph_data_tp3_simple, u, v)
+            _, _, p_sans, _ = calculer_flot(g_sans, "DC", "Clients")
+            impacts.append(((u, v), p_sans, perf_nom - p_sans))
+
+    impacts.sort(key=lambda x: x[2], reverse=True)
+    html = "<div class='grid grid-cols-1 md:grid-cols-2 gap-2 mt-2'>"
+    for (u, v), p_sans, impact in impacts:
+        color = "text-red-600 font-bold" if impact > 50 else "text-amber-600" if impact > 0 else "text-slate-500"
+        html += f"<div class='p-2 bg-slate-50 rounded border border-slate-200 flex justify-between'><span>{u} &rarr; {v}</span><span class='{color}'>Impact : -{impact} (flot restant = {p_sans})</span></div>"
+    html += "</div>"
+    document.getElementById("tp3-arcs-impacts").innerHTML = html
+
+# ==============================================================================
+# BANC DE TESTS AUTOMATISÉS
+# ==============================================================================
+
+def lancer_tous_les_tests(event=None):
+    document.getElementById("tests-summary-card").classList.remove("hidden")
+    log_div = document.getElementById("tests-log")
+    log_div.innerHTML = ""
+
+    def add_log(titre, status, msg=""):
+        badge = "<span class='px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-900 text-emerald-300'>PASS</span>" if status else "<span class='px-2 py-0.5 rounded text-[10px] font-bold bg-red-900 text-red-300'>FAIL</span>"
+        color = "text-emerald-400" if status else "text-red-400 font-bold"
+        log_div.innerHTML += f"<div class='flex items-start justify-between py-1 border-b border-slate-800/60'><div><span class='{color}'>{titre}</span> <span class='text-slate-400 text-xs ml-2'>{msg}</span></div>{badge}</div>"
+
+    succes_total = True
+    total_assertions = 0
+
+    # Test 1 : TP1 Flot Nominal
+    total_assertions += 1
+    d, r, f_nom, _ = calculer_flot(graph_data_C, "S*", "T*")
+    t1 = (f_nom == 850)
+    add_log("TP1 - Flot Maximal Nominal", t1, f"Valeur obtenue : {f_nom} Gbps (attendu : 850 Gbps)")
+    succes_total = succes_total and t1
+
+    # Test 2 : TP1 Vérification contraintes
+    total_assertions += 1
+    v = verifier_flot(graph_data_C, d, "S*", "T*")
+    t2 = v["capacites"] and v["conservation"]
+    add_log("TP1 - Vérification Capacités & Conservation", t2, "Tous les nœuds et arcs respectent les règles de Kirchhoff")
+    succes_total = succes_total and t2
+
+    # Test 3 : TP1 Coupe min = Flot Max
+    total_assertions += 1
+    _, _, c_arcs, cap_coupe = calculer_coupe_minimale(graph_data_C, r, "S*")
+    t3 = (cap_coupe == 850 and cap_coupe == f_nom)
+    add_log("TP1 - Théorème Flot-Max / Coupe-Min", t3, f"Capacité coupe = {cap_coupe} Gbps (Coupe saturée vérifiée)")
+    succes_total = succes_total and t3
+
+    # Test 4 : TP1 Scénarios Étape 6
+    total_assertions += 1
+    _, _, f_sc1, _ = calculer_flot(graph_data_C_add100_REItoEST, "S*", "T*")
+    t4 = (f_sc1 == 850)  # Goulot en amont empêche l'augmentation
+    add_log("TP1 - Scénario +100 sur REI -> EST", t4, f"Flot = {f_sc1} Gbps (Capacité bloquée par l'amont)")
+    succes_total = succes_total and t4
+
+    # Test 5 : TP3 Flot nominal Datacenter
+    total_assertions += 1
+    _, _, f_dc_nom, _ = calculer_flot(graph_data_datacenter, "S*", "T*")
+    t5 = (f_dc_nom == 1050)
+    add_log("TP3 - Flot Nominal Réseau Datacenter", t5, f"Flot nominal = {f_dc_nom} Gbps (attendu : 1050 Gbps)")
+    succes_total = succes_total and t5
+
+    # Test 6 : TP3 Panne majeure DC-PARIS
+    total_assertions += 1
+    res_paris = analyser_desactivation_sommet(graph_data_datacenter, "DC-PARIS")
+    t6 = (res_paris["flot"] == 580 and len(res_paris["zones_non_servies"]) > 0)
+    add_log("TP3 - Panne Datacenter DC-PARIS", t6, f"Flot après reroutage = {res_paris['flot']} Gbps (Perte : -470 Gbps)")
+    succes_total = succes_total and t6
+
+    # Test 7 : TP3 Panne critique Routeur PAR (Blackout IDF)
+    total_assertions += 1
+    res_par = analyser_desactivation_sommet(graph_data_datacenter, "PAR")
+    t7 = (res_par["flot"] == 470 and any("IDF (0/530)" in z for z in res_par["zones_non_servies"]))
+    add_log("TP3 - Panne Routeur Central PAR", t7, f"Flot après reroutage = {res_par['flot']} Gbps (Isolation totale IDF confirmée)")
+    succes_total = succes_total and t7
+
+    # Résumé
+    badge_el = document.getElementById("tests-badge-status")
+    head_el = document.getElementById("tests-headline")
+    sub_el = document.getElementById("tests-subline")
+
+    if succes_total:
+        badge_el.className = "w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-emerald-100 text-emerald-700"
+        badge_el.innerText = "✓"
+        head_el.innerText = "Validation Complète Réussie !"
+        sub_el.innerText = f"{total_assertions}/{total_assertions} tests passés avec succès."
+    else:
+        badge_el.className = "w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-red-100 text-red-700"
+        badge_el.innerText = "✗"
+        head_el.innerText = "Échec d'un ou plusieurs tests"
+        sub_el.innerText = "Consultez les détails ci-dessous."
+
+# ==============================================================================
+# INITIALISATION AU CHARGEMENT DE PYSCRIPT
+# ==============================================================================
+status_badge = document.getElementById("status-badge")
+status_text = document.getElementById("status-text")
+status_badge.className = "flex items-center gap-2 bg-emerald-800/90 px-3 py-1.5 rounded-full border border-emerald-600 text-xs text-emerald-100"
+status_text.innerText = "PyScript & Python Prêts (Pyodide 2024)"
+
+# Exécution automatique du cas nominal au démarrage
+executer_tp1_nominal()
+executer_tp3_toutes_pannes()
+    </script>
+</body>
+</html>
