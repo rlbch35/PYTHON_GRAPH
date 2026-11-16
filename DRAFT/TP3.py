@@ -1,8 +1,13 @@
+# from Projet_main import (
+#     calculer_coupe_minimale,
+#     calculer_flot,
+#     etudier_scenario,
+#     extraire_donnees_graphe,
+# )
+
 from Projet_main import (
-    calculer_coupe_minimale,
-    calculer_flot,
-    etudier_scenario,
-    extraire_donnees_graphe,
+    calcul_flot,
+    coupe,
 )
 
 from graphes import (

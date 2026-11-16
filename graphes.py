@@ -7,7 +7,7 @@
 # ============================================================
 
 # Structure du graphe pour la PARTIE C
-graph_data_C = {
+graph_data_TP1 = {
     "S*": [
         {"to": "DC-LILLE", "capacite": 420},
         {"to": "DC-PARIS", "capacite": 650}
@@ -48,7 +48,7 @@ graph_data_C = {
 }
 
 # ÉTAPE 6 : Scénario réflexion (+100 sur REI -> EST)
-graph_data_C_add100_REItoEST = {
+graph_data_TP1_add100_REItoEST = {
     "S*": [
         {"to": "DC-LILLE", "capacite": 420},
         {"to": "DC-PARIS", "capacite": 650}
@@ -89,7 +89,7 @@ graph_data_C_add100_REItoEST = {
 }
 
 # ÉTAPE 6 : Scénario réflexion (+100 sur ROU -> REI)
-graph_data_C_add100_ROUtoREI = {
+graph_data_TP1_add100_ROUtoREI = {
     "S*": [
         {"to": "DC-LILLE", "capacite": 420},
         {"to": "DC-PARIS", "capacite": 650}
@@ -131,11 +131,55 @@ graph_data_C_add100_ROUtoREI = {
 
 
 # ============================================================
-# GRAPHES POUR LE TP3
+# GRAPHES POUR LE TP2
 # ============================================================
+# Structure du graphe
 
+graph_data_TP2 = {
+    "S*": [
+        {"to": "DC-A", "capacite": 200, "latence": 0},
+        {"to": "DC-B", "capacite": 250, "latence": 0}
+    ],
+    "DC-A": [
+        {"to": "R1", "capacite": 200, "latence": 5}
+    ],
+    "DC-B": [
+        {"to": "R2", "capacite": 250, "latence": 7}
+    ],
+    "R1": [
+        {"to": "R3", "capacite": 160, "latence": 6},
+        {"to": "LIVE", "capacite": 100, "latence": 18}
+    ],
+    "R2": [
+        {"to": "R3", "capacite": 220, "latence": 12},
+        {"to": "BACKUP", "capacite": 100, "latence": 25}
+    ],
+    "R3": [
+        {"to": "LIVE", "capacite": 220, "latence": 8},
+        {"to": "BACKUP", "capacite": 250, "latence": 10}
+    ],
+    "LIVE": [
+        {"to": "T*", "capacite": 220, "latence": 0}
+    ],
+    "BACKUP": [
+        {"to": "T*", "capacite": 200, "latence": 0}
+    ]
+}
+
+# Positionnement du graphe pour l'affichage Matplotlib
+pos_TP2 = {
+    'S*': (-2, 1),
+    'DC-A': (0, 2),
+    'DC-B': (0, 0),
+    'R1': (4, 2),
+    'R2': (4, 0),
+    'R3': (6, 1),
+    'LIVE': (8, 2),
+    'BACKUP': (8, 0),
+    'T*': (10, 1),
+}
 # Graphe simple initial de démonstration TP3
-graph_data = {
+graph_data_TP3 = {
     "DC": [
         {"to": "R1", "capacite": 180},
         {"to": "R2", "capacite": 180}
@@ -157,7 +201,7 @@ graph_data = {
 }
 
 # Débits initiaux pour TP3
-debits = {
+debits_TP3 = {
     ("DC", "R1"): 70,
     ("DC", "R2"): 50,
     ("R1", "R3"): 30,
@@ -169,7 +213,7 @@ debits = {
 }
 
 # Graphe TP3 avec l'arc R1 -> R3 désactivé
-graph_data_R1R3disable = {
+graph_data_TP3_R1R3disable = {
     "DC": [
         {"to": "R1", "capacite": 180, "enabled": True},
         {"to": "R2", "capacite": 180, "enabled": True}
@@ -191,7 +235,7 @@ graph_data_R1R3disable = {
 }
 
 # Graphe TP3 avec l'arc R3 -> Clients désactivé
-graph_data_R3Clidisable = {
+graph_data_TP3_R3Clidisable = {
     "DC": [
         {"to": "R1", "capacite": 180, "enabled": True},
         {"to": "R2", "capacite": 180, "enabled": True}
@@ -213,7 +257,7 @@ graph_data_R3Clidisable = {
 }
 
 # Réseau multi-datacenter complet (Partie D TP3)
-graph_data_datacenter = {
+graph_data_TP3_datacenter = {
     "S*": [
         {"to": "DC-LILLE", "capacite": 350},
         {"to": "DC-PARIS", "capacite": 500},
