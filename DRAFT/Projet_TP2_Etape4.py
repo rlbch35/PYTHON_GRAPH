@@ -238,7 +238,7 @@ def dijkstra(G,chemins_trouves,weight='latence'):
         #print(chemin)
         Valeur_chemin=0
         for arc in chemin:#Pour chaque arc, on additionne le poids choisi
-         Valeur_chemin+=G.edges[arc[0],arc[1]][weight]
+            Valeur_chemin+=G.edges[arc[0],arc[1]][weight]
         if Valeur_Dijsktra>Valeur_chemin:#On garde en mémoire le plus petit
             Valeur_Dijsktra=Valeur_chemin
             Chemin_plus_court=chemin

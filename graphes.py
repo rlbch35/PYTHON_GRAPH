@@ -166,6 +166,36 @@ graph_data_TP2 = {
     ]
 }
 
+graph_data_TP2_ajout_latenceR1 = {
+    "S*": [
+        {"to": "DC-A", "capacite": 200, "latence": 0},
+        {"to": "DC-B", "capacite": 250, "latence": 0}
+    ],
+    "DC-A": [
+        {"to": "R1", "capacite": 200, "latence": 5}
+    ],
+    "DC-B": [
+        {"to": "R2", "capacite": 250, "latence": 7}
+    ],
+    "R1": [
+        {"to": "R3", "capacite": 160, "latence": 32},
+        {"to": "LIVE", "capacite": 100, "latence": 18}
+    ],
+    "R2": [
+        {"to": "R3", "capacite": 220, "latence": 12},
+        {"to": "BACKUP", "capacite": 100, "latence": 25}
+    ],
+    "R3": [
+        {"to": "LIVE", "capacite": 220, "latence": 8},
+        {"to": "BACKUP", "capacite": 250, "latence": 10}
+    ],
+    "LIVE": [
+        {"to": "T*", "capacite": 220, "latence": 0}
+    ],
+    "BACKUP": [
+        {"to": "T*", "capacite": 200, "latence": 0}
+    ]
+}
 # Positionnement du graphe pour l'affichage Matplotlib
 pos_TP2 = {
     'S*': (-2, 1),
