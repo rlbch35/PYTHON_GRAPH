@@ -4,7 +4,7 @@ from collections import deque
 from graphes import graph_data_TP1, graph_data_TP1_add100_REItoEST, graph_data_TP1_add100_ROUtoREI, graph_data_TP3, debits_TP3, graph_data_TP3_R1R3disable, graph_data_TP3_R3Clidisable, graph_data_TP3_datacenter,graph_data_TP2, pos_TP2
 
 # ============================================================
-# EXTRACTION DONNEES GRAPHE (TP1 + TP2 + TP3)
+# EXTRACTION DONNEES GRAPHE 
 # ============================================================
 
 def extraire_donnees_graphe(graph_data):
@@ -237,7 +237,7 @@ def recherche_all_chemins(graph_data, source, sink):
 def bfs(graph_data, source, sink, chemins_deja_trouves):
     """
     Cherche un chemin qui n'a pas été trouvé entre source et sink en largeur,
-    en utilisant extraire_donnees_graphe (sans NetworkX).
+    en utilisant extraire_donnees_graphe.
     """
     _, _, successeurs, _ = extraire_donnees_graphe(graph_data)
     # La file stocke des chemins entiers (listes de sommets) et non plus de simples noeuds
@@ -283,52 +283,6 @@ def dijkstra(graph_data, chemins_trouves, poids_arcs=None):
         #print(f"La somme de du chemin est {Valeur_chemin} ") 
 
     return Valeur_Dijsktra, Chemin_plus_court
-
-
-# ============================================================
-# VISUALISATION
-# ============================================================
-
-def dessiner_graphe_projet(graph_data, debits, taux_utilisations):
-    """Construit un graphe NetworkX uniquement pour l'affichage visuel."""
-    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
-    latences = extraire_latences(graph_data)
-
-    G_visu = nx.DiGraph()
-    for (u, v), cap in arcs.items():
-        G_visu.add_edge(u, v, capacite=cap, latence=latences.get((u, v), 0), debit=debits.get((u, v), 0))
-
-    plt.figure(figsize=(10, 6))
-    edge_colors = []
-    for edge in G_visu.edges:
-        taux = taux_utilisations.get(edge, 0)
-        if taux > 0.9:
-            edge_colors.append('red')
-        elif taux > 0.5:
-            edge_colors.append('yellow')
-        else:
-            edge_colors.append('green')
-
-    max_debit = max((debits.get(e, 0) for e in G_visu.edges), default=0)
-    edge_widths = []
-    for edge in G_visu.edges:
-        debit = debits.get(edge, 0)
-        width = 1.0 + 6.5 * (debit / max_debit) if max_debit > 0 else 1.0
-        edge_widths.append(width)
-
-    nx.draw(
-        G_visu, pos_TP2, with_labels=True, node_color='lightblue',
-        node_size=2500, font_weight='bold', arrowsize=20,
-        edge_color=edge_colors, width=edge_widths
-    )
-    edge_labels = {
-        edge: f"{debits.get(edge, 0)}/{arcs[edge]}/{latences.get(edge, 0)}ms"
-        for edge in G_visu.edges
-    }
-    nx.draw_networkx_edge_labels(G_visu, pos, edge_labels=edge_labels, font_color='darkblue')
-    plt.title("Flot final dans le réseau (Arcs saturés en rouge)")
-    plt.show()
-
 
 # ============================================================
 # TP3 - ANALYSE D'IMPACTS, CONNECTIVITÉ ET PANNES N-1
@@ -465,62 +419,276 @@ def analyser_desactivation_sommet(graph_data, sommet, source, sink):
 # PROGRAMME PRINCIPAL (TP1 + TP2 + TP3)
 # ============================================================
 
-def main():
-    # Extraction en Python natif
-    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data_TP1)
-
-    # Détection de la source et du puits sans NetworkX
-    sources = [s for s in sommets if len(predecesseurs[s]) == 0]
-    sinks = [s for s in sommets if len(successeurs[s]) == 0]
+def trouver_source_et_puits(graph_data):
+    """Trouve automatiquement la source (sans prédécesseur) et le puits (sans successeur)."""
+    sommets, _, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
+    sources = []
+    sinks = []
+    for sommet in sommets:
+        if len(predecesseurs[sommet]) == 0:
+            sources.append(sommet)
+        if len(successeurs[sommet]) == 0:
+            sinks.append(sommet)
     if len(sources) != 1 or len(sinks) != 1:
         raise ValueError("Le graphe doit contenir exactement 1 source et 1 puits.")
+    return sources[0], sinks[0]
 
+
+def main():
+    graph_data = graph_data_TP2
+
+    # ============================================================
+    # ÉTAPE 1 - Extraction et initialisation des données
+    # ============================================================
+    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
+    latences = extraire_latences(graph_data)
+
+    # ============================================================
+    # Initialisation du graphe
+    # ============================================================
+    # Initialisation dynamique de tous les débits à 0
+    debits = {}
+    for arc in arcs:
+        debits[arc] = 0
+
+    # On définit source et sink (sommet sans prédécesseur / sans successeur)
+    sources = []
+    sinks = []
+    for sommet in sommets:
+        if len(predecesseurs[sommet]) == 0:
+            sources.append(sommet)
+        if len(successeurs[sommet]) == 0:
+            sinks.append(sommet)
+
+    if len(sources) != 1 or len(sinks) != 1:
+        raise ValueError("Le graphe doit contenir exactement 1 source et 1 puits.")
     source = sources[0]
     sink = sinks[0]
 
-    debits = {arc: 0 for arc in arcs}
-    residual = dict(arcs)
+    # Création du graphe résiduel initial
+    residual = {}
+    for arc, capacite in arcs.items():
+        residual[arc] = capacite - debits[arc]
 
-    # --- TP1 ---
-    capacite_coupe = calcul_residuel(graph_data_TP1, source, sink, debits, residual, afficher=True)
+    # ============================================================
+    # TP1 - Calcul du flot maximal et de la coupe minimale
+    # ============================================================
+    capacite_coupe = calcul_residuel(graph_data, source, sink, debits, residual, afficher=True)
     debit_arc(debits, residual)
-    calcul_flot(graph_data_TP1, source, debits, capacite_coupe)
+    valeur_flot_tp1 = calcul_flot(graph_data, source, debits, capacite_coupe)
 
-    # --- TP2 ---
-    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data_TP2)
-    taux_utilisations, _ = infos_arcs(graph_data_TP2, debits)
-    chemins_trouves = recherche_all_chemins(graph_data_TP2, source, sink)
-    Distance, Chemin = dijkstra(graph_data_TP2, chemins_trouves)
+    # ============================================================
+    # TP2 - Latences dynamiques et plus court chemin (Dijkstra)
+    # ============================================================
+    taux_utilisations, _ = infos_arcs(graph_data, debits)
+    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
+    Distance, Chemin = dijkstra(graph_data, chemins_trouves)
     print("\n")
     print(f"Le chemin le plus court a pour distance : {Distance} et est {Chemin}")
 
-    # --- TP3 ---
-    print("\n" + "=" * 60)
-    print("TP3 - ANALYSE D'IMPACTS ET PANNES N-1")
-    print("=" * 60)
+    # ============================================================
+    # Représentation graphique
+    # ============================================================
+    G = nx.DiGraph()
+    for (u, v), capacite in arcs.items():
+        G.add_edge(
+            u, v,
+            capacite=capacite,
+            latence=latences.get((u, v), 0),
+            debit=debits.get((u, v), 0),
+            taux_utilisation=taux_utilisations.get((u, v), 0),
+        )
 
-    print("\n--- Classement des impacts sur le graphe du projet ---")
-    for arc, perf_sans, impact in classer_impacts(graph_data_TP3, source, sink):
-        print(f"{arc[0]} -> {arc[1]} : flot sans l'arc = {perf_sans}, impact = {impact}")
+    plt.figure(num="TP1 & TP2 - Réseau Live / Backup (Flot & Latence)", figsize=(10, 6))
+    # Modification des couleurs en fonction de l'utilisation
+    edge_colors = []
+    for edge in G.edges:
+        taux_utilisation = G[edge[0]][edge[1]]['taux_utilisation']
+        if taux_utilisation>0.9:
+            edge_colors.append('red')
+        elif taux_utilisation > 0.5:
+            edge_colors.append('yellow')
+        else:
+            edge_colors.append('green')
 
-    print("\n--- Connectivité DFS depuis la source ---")
-    print(dfs_connectivite(graph_data, source))
+    # Modification des largeurs en fonction du débit
+    max_debit = 0
+    for u, v in G.edges:
+        debit = G[u][v]['debit']
+        if debit > max_debit:
+            max_debit = debit
 
-    try:
-        from graphes import graph_data_datacenter
-        soms_test = ["DC-LILLE", "DC-PARIS", "DC-LYON", "LIL", "PAR", "LYO", "REI", "STR"]
-        for s_test in soms_test:
-            res = analyser_desactivation_sommet(graph_data_datacenter, s_test, "S*", "T*")
-            print(f"\n--- Désactivation de {s_test} ---")
-            print(f"Trafic servi : {res['performance_apres_desactivation']}")
-            print(f"Taux max d'utilisation : {res['taux_max_utilisation']}%")
-            print(f"Zones non totalement servies : {res['zones_non_servies']}")
-            print(f"Nouvelle coupe limitante : {res['arcs_coupe_minimale']} (capacité = {res['capacite_coupe_minimale']})")
-    except ImportError:
-        pass
+    edge_widths = []
+    for edge in G.edges:
+        debit = G[edge[0]][edge[1]]['debit']
+        if max_debit > 0:
+            # Épaisseur comprise entre 1.0 (vide) et 6.5 (débit max)
+            width = 1.0 + 6.5 * (debit / max_debit)
+        else:
+            width = 1.0
+        edge_widths.append(width)
 
-    # --- Affichage visuel ---
-    dessiner_graphe_projet(graph_data_TP3, debits, taux_utilisations)
+    nx.draw(
+        G, pos_TP2, with_labels=True, node_color='lightblue',
+        node_size=2500, font_weight='bold', arrowsize=20,
+        edge_color=edge_colors, width=edge_widths
+    )
+    edge_labels = {}
+    for edge in G.edges:
+        u = edge[0]
+        v = edge[1]
+        capacite_arc = G[u][v]['capacite']
+        latence_arc = G[u][v]['latence']
+        edge_labels[edge] = f"{debits[edge]}/{capacite_arc}/{latence_arc}ms"
+    nx.draw_networkx_edge_labels(G, pos_TP2, edge_labels=edge_labels, font_color='darkblue')
+    plt.title(f"TP1 & TP2 - Flot maximal : {valeur_flot_tp1} | Plus court chemin : {Distance} ms (Arcs >90% en rouge)")
+    plt.show()
+
+    # ============================================================
+    # TP3
+    # ============================================================
+    # On retrouve automatiquement la source et le puits pour le graphe TP3
+    source_tp3, puit_tp3 = trouver_source_et_puits(graph_data_TP3)
+
+    impacts = classer_impacts(graph_data_TP3, source_tp3, puit_tp3)
+
+    print("\n--- Classement des impacts ---")
+    for arc, performance_sans_arc, impact in impacts:
+        print(
+            f"{arc[0]} -> {arc[1]} : "
+            f"flot sans l'arc = {performance_sans_arc}, "
+            f"impact = {impact}"
+        )
+
+    ### Graphe initial, puis R1-R3 désactivé, puis R3-Clients désactivé (sans etudier_scenario)
+    scenarios_tp3 = [graph_data_TP3, graph_data_TP3_R1R3disable, graph_data_TP3_R3Clidisable]
+    titres_tp3 = [
+        "TP3 - Scénario initial",
+        "TP3 - Arc R1 -> R3 désactivé",
+        "TP3 - Arc R3 -> Clients désactivé",
+    ]
+    pos_tp3 = {
+        "DC": (0, 1),
+        "R1": (1, 2),
+        "R2": (1, 0),
+        "R3": (2, 2),
+        "R4": (2, 0),
+        "Clients": (3, 1),
+    }
+
+    for indice in range(len(scenarios_tp3)):
+        donnees = scenarios_tp3[indice]
+        titre_scen = titres_tp3[indice]
+
+        arcs_scen, debits_scen, residual_scen, _, arcs_coupe_scen, capacite_coupe_scen = calculer_flot_et_coupe(
+            donnees, source_tp3, puit_tp3
+        )
+        print(f"\n--- {titre_scen} ({source_tp3} -> {puit_tp3}) ---")
+        debit_arc(debits_scen, residual_scen)
+        calcul_flot(donnees, source_tp3, debits_scen, capacite_coupe_scen)
+        print(f"Arcs de la coupe minimale : {arcs_coupe_scen} (capacité = {capacite_coupe_scen})")
+
+        # Représentation graphique avec NetworkX & Matplotlib
+        G_tp3 = nx.DiGraph()
+        for (u, v), cap in arcs_scen.items():
+            G_tp3.add_edge(u, v, capacite=cap, debit=debits_scen.get((u, v), 0))
+
+        edge_colors_tp3 = []
+        edge_widths_tp3 = []
+        edge_labels_tp3 = {}
+        for edge in G_tp3.edges:
+            u = edge[0]
+            v = edge[1]
+            cap_arc = G_tp3[u][v]["capacite"]
+            deb_arc = G_tp3[u][v]["debit"]
+            edge_labels_tp3[edge] = f"{deb_arc}/{cap_arc}"
+            if deb_arc == cap_arc:
+                edge_colors_tp3.append("red")
+                edge_widths_tp3.append(3.0)
+            else:
+                edge_colors_tp3.append("gray")
+                edge_widths_tp3.append(1.2)
+
+        plt.figure(num=titre_scen, figsize=(9, 5))
+        nx.draw(
+            G_tp3, pos_tp3, with_labels=True, node_color="lightblue",
+            node_size=2500, font_weight="bold", arrowsize=20,
+            edge_color=edge_colors_tp3, width=edge_widths_tp3,
+        )
+        nx.draw_networkx_edge_labels(G_tp3, pos_tp3, edge_labels=edge_labels_tp3, font_color="darkblue")
+        plt.title(f"{titre_scen} | Flot max : {capacite_coupe_scen} (Arcs saturés en rouge)")
+        plt.show()
+
+    dfs = dfs_connectivite(graph_data_TP3, source_tp3)
+    print(f"\nSommets atteignables depuis {source_tp3} : {dfs}")
+
+    resultats_connectivite = etude_disable_connectivite(graph_data_TP3)
+
+    # On retrouve automatiquement la source et le puits pour le réseau datacenter
+    source_dc, puit_dc = trouver_source_et_puits(graph_data_TP3_datacenter)
+
+    # Représentation graphique du réseau datacenter
+    arcs_dc, debits_dc, _, flot_dc, _, _ = calculer_flot_et_coupe(
+        graph_data_TP3_datacenter, source_dc, puit_dc
+    )
+    G_dc = nx.DiGraph()
+    for (u, v), cap in arcs_dc.items():
+        G_dc.add_edge(u, v, capacite=cap, debit=debits_dc.get((u, v), 0))
+
+    pos_dc = {
+        "S*": (0, 1),
+        "DC-LILLE": (2, 2),
+        "DC-PARIS": (2, 1),
+        "DC-LYON": (2, 0),
+        "LIL": (4, 2),
+        "PAR": (4, 1),
+        "LYO": (4, 0),
+        "REI": (6, 1.5),
+        "STR": (6, 0.5),
+        "NORD": (8, 2),
+        "IDF": (8, 1),
+        "Sud-Est": (8, 0),
+        "T*": (10, 1),
+    }
+
+    edge_colors_dc = []
+    edge_widths_dc = []
+    edge_labels_dc = {}
+    for edge in G_dc.edges:
+        u = edge[0]
+        v = edge[1]
+        cap_arc = G_dc[u][v]["capacite"]
+        deb_arc = G_dc[u][v]["debit"]
+        edge_labels_dc[edge] = f"{deb_arc}/{cap_arc}"
+        if deb_arc == cap_arc:
+            edge_colors_dc.append("red")
+            edge_widths_dc.append(3.0)
+        else:
+            edge_colors_dc.append("gray")
+            edge_widths_dc.append(1.2)
+
+    plt.figure(num="TP3 - Réseau Datacenter (État nominal)", figsize=(11, 6))
+    nx.draw(
+        G_dc, pos_dc, with_labels=True, node_color="lightblue",
+        node_size=2400, font_weight="bold", font_size=9, arrowsize=20,
+        edge_color=edge_colors_dc, width=edge_widths_dc,
+    )
+    nx.draw_networkx_edge_labels(G_dc, pos_dc, edge_labels=edge_labels_dc, font_color="darkblue", font_size=8)
+    plt.title(f"TP3 - Réseau Datacenter nominal | Flot max : {flot_dc} Gbps (Arcs saturés en rouge)")
+    plt.show()
+
+    sommet_a_tester = ["DC-LILLE", "DC-PARIS", "DC-LYON", "LIL", "PAR", "LYO", "REI", "STR"]
+    for sommet in sommet_a_tester:
+        print(f"\n--- Étude de connectivité graph_data_TP3_datacenter - Désactivation de {sommet} ---")
+        resultats_connectivite_dict = analyser_desactivation_sommet(
+            graph_data_TP3_datacenter, sommet, source_dc, puit_dc
+        )
+        print(f"Performance après désactivation de {sommet} : {resultats_connectivite_dict['performance_apres_desactivation']}")
+        print(f"Taux maximal d'utilisation : {resultats_connectivite_dict['taux_max_utilisation']}%")
+        print(f"Zones non totalement servies : {resultats_connectivite_dict['zones_non_servies']}")
+        print(f"Arcs de la coupe minimale : {resultats_connectivite_dict['arcs_coupe_minimale']}")
+        print(f"Capacité de la coupe minimale : {resultats_connectivite_dict['capacite_coupe_minimale']}")
+    
 
 
 if __name__ == "__main__":
