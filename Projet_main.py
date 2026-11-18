@@ -1,7 +1,20 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import deque
-from graphes import graph_data_TP1, graph_data_TP1_add100_REItoEST, graph_data_TP1_add100_ROUtoREI, graph_data_TP3, debits_TP3, graph_data_TP3_R1R3disable, graph_data_TP3_R3Clidisable, graph_data_TP3_datacenter,graph_data_TP2, pos_TP2,graph_data_TP2_ajout_latenceR1
+from graphes import (
+    graph_data_TP1,
+    graph_data_TP1_add100_REItoEST,
+    graph_data_TP1_add100_ROUtoREI,
+    graph_data_TP3,
+    debits_TP3,
+    graph_data_TP3_R1R3disable,
+    graph_data_TP3_R3Clidisable,
+    graph_data_TP3_datacenter,
+    graph_data_TP3_datacenter_DCPARIS_disable,
+    graph_data_TP2,
+    pos_TP2,
+    graph_data_TP2_ajout_latenceR1,
+)
 
 # ============================================================
 # EXTRACTION DONNEES GRAPHE 
@@ -839,9 +852,13 @@ def main():
     sommet_a_tester = ["DC-LILLE", "DC-PARIS", "DC-LYON", "LIL", "PAR", "LYO", "REI", "STR"]
     for sommet in sommet_a_tester:
         print(f"\n--- Étude de connectivité graph_data_TP3_datacenter - Désactivation de {sommet} ---")
-        resultats_connectivite_dict = analyser_desactivation_sommet(
-            graph_data_TP3_datacenter, sommet, source_dc, puit_dc
-        )
+        resultats_connectivite_dict = analyser_desactivation_sommet(graph_data_TP3_datacenter, sommet, source_dc, puit_dc)
+        trafic_perdu = 0
+        for (u, v), debit in debits_dc.items():
+            if u == sommet:
+                trafic_perdu += debit
+        trafic_avant_reroutage = flot_dc - trafic_perdu
+        print(f"Trafic après panne (avant reroutage) de {sommet} : {trafic_avant_reroutage} Gbps")
         print(f"Performance après désactivation de {sommet} : {resultats_connectivite_dict['performance_apres_desactivation']}")
         print(f"Taux maximal d'utilisation : {resultats_connectivite_dict['taux_max_utilisation']}%")
         print(f"Taux de trafic maintenu : {resultats_connectivite_dict['taux_trafic_maintenu']}% (perte : {resultats_connectivite_dict['taux_perte']}%)")
@@ -849,7 +866,81 @@ def main():
         print(f"Arcs de la coupe minimale : {resultats_connectivite_dict['arcs_coupe_minimale']}")
         print(f"Capacité de la coupe minimale : {resultats_connectivite_dict['capacite_coupe_minimale']}")
     
+    #Partie E
+    # Représentation de l'incident DC-PARIS : Nominal (1050) | Après panne avant reroutage (550) | Après reroutage (580)
+    arcs_dcparis, debits_dcparis, _, flot_dcparis, _, _ = calculer_flot_et_coupe(
+        graph_data_TP3_datacenter_DCPARIS_disable, source_dc, puit_dc
+    )
 
+    # Vue après panne, avant reroutage : on retire uniquement les 3 flux spécifiques de DC-PARIS (500 Gbps)
+    # 10 Gbps -> NORD, 310 Gbps -> IDF, 180 Gbps -> Sud-Est
+    debits_dcparis_avant_reroutage = {}
+    for arc in arcs_dcparis:
+        debits_dcparis_avant_reroutage[arc] = debits_dc.get(arc, 0)
+
+    flux_dcparis = [
+        ([("PAR", "REI"), ("REI", "NORD"), ("NORD", "T*")], 10),
+        ([("PAR", "REI"), ("REI", "IDF"), ("IDF", "T*")], 310),
+        ([("PAR", "STR"), ("STR", "Sud-Est"), ("Sud-Est", "T*")], 180),
+    ]
+    for chemin_arcs, quantite in flux_dcparis:
+        for arc in chemin_arcs:
+            if arc in debits_dcparis_avant_reroutage:
+                debits_dcparis_avant_reroutage[arc] -= quantite
+
+    flot_dcparis_avant = flot_dc - 500
+    taux_avant = round((flot_dcparis_avant / flot_dc) * 100, 1) if flot_dc > 0 else 0
+    taux_apres = round((flot_dcparis / flot_dc) * 100, 1) if flot_dc > 0 else 0
+
+    vues_dcparis = [
+        ("1. État nominal", arcs_dc, debits_dc, f"Flot : {flot_dc} Gbps (100.0%)"),
+        ("2. Après panne DC-PARIS (avant reroutage)", arcs_dcparis, debits_dcparis_avant_reroutage, f"Flot : {flot_dcparis_avant} Gbps ({taux_avant}%)"),
+        ("3. Après reroutage (Panne DC-PARIS)", arcs_dcparis, debits_dcparis, f"Flot : {flot_dcparis} Gbps ({taux_apres}% | +30 Gbps)"),
+    ]
+
+    fig, axes = plt.subplots(
+        1, 3, figsize=(19, 6),
+        num="TP3 Partie E - Incident DC-PARIS (Avant / Panne / Reroutage)"
+    )
+
+    for i in range(len(vues_dcparis)):
+        titre_vue, arcs_e, debits_e, sous_titre = vues_dcparis[i]
+        ax_courant = axes[i]
+
+        G_e = nx.DiGraph()
+        for (u, v), cap in arcs_e.items():
+            G_e.add_edge(u, v, capacite=cap, debit=debits_e.get((u, v), 0))
+
+        edge_colors_e = []
+        edge_widths_e = []
+        edge_labels_e = {}
+        for edge in G_e.edges:
+            u = edge[0]
+            v = edge[1]
+            cap_arc = G_e[u][v]["capacite"]
+            deb_arc = G_e[u][v]["debit"]
+            edge_labels_e[edge] = f"{deb_arc}/{cap_arc}"
+            if deb_arc == cap_arc:
+                edge_colors_e.append("red")
+                edge_widths_e.append(2.5)
+            else:
+                edge_colors_e.append("gray")
+                edge_widths_e.append(1.1)
+
+        nx.draw(
+            G_e, pos_dc, ax=ax_courant, with_labels=True, node_color="lightblue",
+            node_size=900, font_weight="bold", font_size=7, arrowsize=12,
+            edge_color=edge_colors_e, width=edge_widths_e,
+        )
+        nx.draw_networkx_edge_labels(
+            G_e, pos_dc, edge_labels=edge_labels_e, ax=ax_courant,
+            font_color="darkblue", font_size=6
+        )
+        ax_courant.set_title(f"{titre_vue}\n{sous_titre}", fontsize=10, fontweight="bold")
+
+    plt.tight_layout()
+    plt.show()
+    
 
 if __name__ == "__main__":
     main()

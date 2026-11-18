@@ -332,3 +332,52 @@ graph_data_TP3_datacenter = {
         {"to": "T*", "capacite": 350}
     ]
 }
+
+
+# Panne du Datacenter principal DC-PARIS (toutes ses arêtes entrantes et sortantes désactivées)
+graph_data_TP3_datacenter_DCPARIS_disable = {
+    "S*": [
+        {"to": "DC-LILLE", "capacite": 350, "enabled": True},
+        {"to": "DC-PARIS", "capacite": 500, "enabled": False},
+        {"to": "DC-LYON", "capacite": 420, "enabled": True}
+    ],
+    "DC-LILLE": [
+        {"to": "LIL", "capacite": 350, "enabled": True}
+    ],
+    "DC-PARIS": [
+        {"to": "PAR", "capacite": 500, "enabled": False}
+    ],
+    "DC-LYON": [
+        {"to": "LYO", "capacite": 420, "enabled": True}
+    ],
+    "LIL": [
+        {"to": "REI", "capacite": 240, "enabled": True},
+        {"to": "PAR", "capacite": 180, "enabled": True}
+    ],
+    "PAR": [
+        {"to": "REI", "capacite": 320, "enabled": True},
+        {"to": "STR", "capacite": 260, "enabled": True},
+        {"to": "LYO", "capacite": 230, "enabled": True}
+    ],
+    "LYO": [
+        {"to": "STR", "capacite": 230, "enabled": True}
+    ],
+    "REI": [
+        {"to": "NORD", "capacite": 250, "enabled": True},
+        {"to": "IDF", "capacite": 350, "enabled": True}
+    ],
+    "STR": [
+        {"to": "Sud-Est", "capacite": 350, "enabled": True},
+        {"to": "IDF", "capacite": 180, "enabled": True}
+    ],
+    "NORD": [
+        {"to": "T*", "capacite": 250, "enabled": True}
+    ],
+    "IDF": [
+        {"to": "T*", "capacite": 530, "enabled": True}
+    ],
+    "Sud-Est": [
+        {"to": "T*", "capacite": 350, "enabled": True}
+    ]
+}
+
