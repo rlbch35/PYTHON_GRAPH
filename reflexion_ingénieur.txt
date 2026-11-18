@@ -1,0 +1,33 @@
+TP1
+
+Réflexion d’ingénieur – Pourquoi faut-il pouvoir revenir sur une décision ?
+
+Pour pouvoir corriger un mauvais choix initial, on réalloue le trafic en passant par un arc
+inverse --> on "annule" un partie du flot envoyer de u vers v pour l'envoyer vers un autre 
+successeur de u.
+
+Réflexion d’ingénieur – Décision d’ingénierie
+Le flot max (= performance du réseau) est égale à la capacité de la ST coupe.
+Donc augement la valeur sur une liaison de la st coupe est le plus opti
+
+
+TP2
+Réflexion d’ingénieur – Un coût qui dépend de la solution
+Si la latence change, le parcours aussi, test en augmentant une arrete
+Construire l'exemple qui le montre
+
+Réflexion d’ingénieur – Décision
+
+
+
+TP3 :
+
+Réflexion d’ingénieur – Pourquoi recalculer depuis zéro ?
+les contraintes de capacité et de conservation 
+arc coupé --> capacité = 0
+Entrant > debit sortant
+
+Réflexion d’ingénieur – Capacité de secours
+Non, car elle peut êre utilse en cas de "casse"... elle joue son rôle de secours..
+Dans les cas simulé, quand on coupe R3-->Clinet, R1-->R4 sature alors qu'elle est peut sollicitée en situation nominale
+
