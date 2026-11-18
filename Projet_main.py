@@ -867,7 +867,8 @@ def main():
         print(f"Capacité de la coupe minimale : {resultats_connectivite_dict['capacite_coupe_minimale']}")
     
     #Partie E
-    # Représentation de l'incident DC-PARIS : Nominal (1050) | Après panne avant reroutage (550) | Après reroutage (580)
+    # Représentation de l'incident DC-PARIS : Nominal (1050) | Après panne avant reroutage (550) | Après reroutage (580) pas la source fictive ?? à revoir
+    print(f"PARTIE E")
     arcs_dcparis, debits_dcparis, _, flot_dcparis, _, _ = calculer_flot_et_coupe(
         graph_data_TP3_datacenter_DCPARIS_disable, source_dc, puit_dc
     )
@@ -898,10 +899,7 @@ def main():
         ("3. Après reroutage (Panne DC-PARIS)", arcs_dcparis, debits_dcparis, f"Flot : {flot_dcparis} Gbps ({taux_apres}% | +30 Gbps)"),
     ]
 
-    fig, axes = plt.subplots(
-        1, 3, figsize=(19, 6),
-        num="TP3 Partie E - Incident DC-PARIS (Avant / Panne / Reroutage)"
-    )
+    fig, axes = plt.subplots(1, 3, figsize=(19, 6),num="TP3 Partie E - Incident DC-PARIS (Avant / Panne / Reroutage)")
 
     for i in range(len(vues_dcparis)):
         titre_vue, arcs_e, debits_e, sous_titre = vues_dcparis[i]
@@ -927,15 +925,8 @@ def main():
                 edge_colors_e.append("gray")
                 edge_widths_e.append(1.1)
 
-        nx.draw(
-            G_e, pos_dc, ax=ax_courant, with_labels=True, node_color="lightblue",
-            node_size=900, font_weight="bold", font_size=7, arrowsize=12,
-            edge_color=edge_colors_e, width=edge_widths_e,
-        )
-        nx.draw_networkx_edge_labels(
-            G_e, pos_dc, edge_labels=edge_labels_e, ax=ax_courant,
-            font_color="darkblue", font_size=6
-        )
+        nx.draw(G_e, pos_dc, ax=ax_courant, with_labels=True, node_color="lightblue",node_size=900, font_weight="bold", font_size=7, arrowsize=12,edge_color=edge_colors_e, width=edge_widths_e,)
+        nx.draw_networkx_edge_labels( G_e, pos_dc, edge_labels=edge_labels_e, ax=ax_courant,font_color="darkblue", font_size=6)
         ax_courant.set_title(f"{titre_vue}\n{sous_titre}", fontsize=10, fontweight="bold")
 
     plt.tight_layout()
