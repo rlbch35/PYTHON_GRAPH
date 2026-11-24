@@ -1,6 +1,5 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-import heapq
 from collections import deque
 from graphes import *
 
@@ -436,7 +435,7 @@ def bfs(graph_data, source, sink, chemins_deja_trouves):
 
 
 def dijkstra(graph_data, source, sink, poids_arcs=None, residual=None):
-    """Algorithme de Dijkstra : trouve le chemin de poids minimal entre source et sink (sans NetworkX)."""
+    """Algorithme de Dijkstra (sans heapq ni NetworkX) : trouve le chemin de poids minimal entre source et sink."""
     sommets, _, successeurs, _ = extraire_donnees_graphe(graph_data)
     if poids_arcs is None:
         poids_arcs = extraire_latences(graph_data)
@@ -444,31 +443,30 @@ def dijkstra(graph_data, source, sink, poids_arcs=None, residual=None):
     distances = {sommet: float('inf') for sommet in sommets}
     distances[source] = 0
     parent = {source: None}
-    visites = set()
-    tas = [(0, source)]  # File de priorité : (distance_actuelle, sommet)
+    non_visites = set(sommets)
 
-    while tas:
-        dist_u, u = heapq.heappop(tas)
+    while non_visites:
+        # 1. On choisit le sommet non visité ayant la plus petite distance connue
+        u = min(non_visites, key=lambda sommet: distances[sommet])
 
-        if u in visites:
-            continue
-        visites.add(u)
-
-        if u == sink:
+        # Si le plus proche est encore à +inf (inatteignable) ou si on a atteint le puits, on s'arrête
+        if distances[u] == float('inf') or u == sink:
             break
 
+        # 2. On fixe définitivement ce sommet
+        non_visites.remove(u)
+
+        # 3. Relâchement de tous ses arcs sortants
         for v in successeurs.get(u, []):
             # Si un graphe résiduel est fourni, on ignore les arcs saturés
             if residual is not None and residual.get((u, v), 0) <= 0:
                 continue
 
             poids = poids_arcs.get((u, v), 0)
-            nouvelle_distance = dist_u + poids
-            # Relâchement de l'arc (u, v)
+            nouvelle_distance = distances[u] + poids
             if nouvelle_distance < distances[v]:
                 distances[v] = nouvelle_distance
                 parent[v] = u
-                heapq.heappush(tas, (nouvelle_distance, v))
 
     chemin = reconstruct_path(parent, source, sink)
     if chemin is None:
