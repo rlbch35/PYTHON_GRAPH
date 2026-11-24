@@ -1,21 +1,12 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import deque
-from graphes import (
-    graph_data_TP1,
-    graph_data_TP1_add100_REItoEST,
-    graph_data_TP1_add100_ROUtoREI,
-    graph_data_TP3,
-    debits_TP3,
-    graph_data_TP3_R1R3disable,
-    graph_data_TP3_R3Clidisable,
-    graph_data_TP3_datacenter,
-    graph_data_TP3_datacenter_DCPARIS_disable,
-    graph_data_TP2,
-    pos_TP2,
-    graph_data_TP2_ajout_latenceR1,
-)
+from graphes import *
 
+
+
+global capacite_sature
+capacite_sature=0
 # ============================================================
 # EXTRACTION DONNEES GRAPHE 
 # ============================================================
@@ -56,6 +47,14 @@ def extraire_latences(graph_data):
                 latences[(src, target["to"])] = target.get("latence", 0)
     return latences
 
+def extraire_cout(graph_data):
+    """Extrait les couts de chaque arc actif sous forme de dictionnaire {(u, v): cout}."""
+    cout = {}
+    for src, targets in graph_data.items():
+        for target in targets:
+            if target.get("enabled", True):
+                cout[(src, target["to"])] = target.get("cout", 0)
+    return cout
 
 # ============================================================
 # FONCTIONS DE BASE : FLOT MAXIMAL & COUPE MINIMALE (TP1)
@@ -161,7 +160,7 @@ def calcul_residuel(graph_data, source, sink, debits, residual, afficher=True):
             if afficher:
                 print(f"Aucun chemin résiduel de {source} vers {sink}.")
                 # --- RÉALISATION DE LA COUPE MINIMALE --- Appel fonction coupe
-            capacite_coupe, _ = coupe(graph_data, source, residual, afficher=afficher)
+            capacite_coupe, _ = coupe(graph_data, source, residual, afficher=True)
             break
 
         if afficher:
@@ -213,41 +212,159 @@ def calcul_flot(graph_data, source, debits, capacite_coupe):
     return valeur_totale_flot
 
 
-def afficher_graphe(arcs,pos,debits,latences=None,titre="État du réseau"):
-    """Affiche le graphe orienté avec les débits, capacités et optionnellement les latences."""
-    G = nx.DiGraph()
-    for (u, v), capacite in arcs.items():
-        lat = latences.get((u, v), 0) if latences is not None else 0
-        G.add_edge(u,v,capacite=capacite,latence=lat,debit=debits.get((u, v), 0))
+def afficher_graphe_reseau(
+    arcs,
+    pos,
+    debits,
+    latences,
+    couts=None,
+    taux_utilisations=None,
+    titre="État du réseau",
+    chemin_highlight=None,
+    mode_congestion=False,
+):
+  """Affiche un graphe orienté du réseau avec plusieurs options de visualisation.
 
-    # Création d'une nouvelle fenêtre à chaque appel (évite d'écraser les graphes précédents)
-    plt.figure(num=titre, figsize=(10, 6))
-    #Modification des couleurs en fonction de l'utilisation
-    edge_colors = ['red' if debits.get(edge, 0) == G[edge[0]][edge[1]]['capacite'] else 'gray' for edge in G.edges]
-    edge_widths = [3.0 if debits.get(edge, 0) == G[edge[0]][edge[1]]['capacite'] else 1.2 for edge in G.edges]
-    #Dessin du graphe
-    nx.draw(G,pos,with_labels=True,node_color="lightblue",node_size=2500,font_weight="bold",arrowsize=20,edge_color=edge_colors,width=edge_widths,
-  )
+  - Si chemin_highlight est fourni : affiche le graphe en gris neutre et ne
+    met en évidence que le chemin (nœuds en doré, arcs en bleu).
+  - Si mode_congestion=True : colore selon le taux d'utilisation
+    (vert/jaune/rouge)
+    et adapte l'épaisseur au débit.
+  - Par défaut : surligne uniquement les arcs saturés en rouge.
+  """
+  taux_utilisations = taux_utilisations or {}
+  couts = couts or {} 
+  # 1. Construction du graphe
+  G = nx.DiGraph()
+  for (u, v), capacite in arcs.items():
+    G.add_edge(
+        u,
+        v,
+        capacite=capacite,
+        latence=round(latences.get((u, v), 0),2),
+        cout=round(couts.get((u, v), 0),1),
+        debit=debits.get((u, v), 0),
+        taux_utilisation=taux_utilisations.get((u, v), 0),
+    )
 
+  # Taille panoramique pour éviter l'écrasement horizontal
+  fig, ax = plt.subplots(num=titre, figsize=(13, 8))
 
-  # Étiquettes des arcs (débit / capacité / latence si fournie)
-    edge_labels = {}
+  # 2. Calcul des couleurs et épaisseurs des arcs
+  if chemin_highlight:
+    edge_colors = ["#BDC3C7" for _ in G.edges]
+    edge_widths = [1.5 for _ in G.edges]
+  elif mode_congestion:
+    edge_colors = []
     for u, v in G.edges:
-        cap = G[u][v]["capacite"]
-        lat = G[u][v]["latence"]
-        deb = G[u][v]["debit"]
-        if latences is not None:
-            edge_labels[(u, v)] = f"{deb}/{cap}/{lat}ms"
-        else:
-            edge_labels[(u, v)] = f"{deb}/{cap}"
+      taux = G[u][v]["taux_utilisation"]
+      if taux > 0.9:
+        edge_colors.append("red")
+      elif taux > 0.5:
+        edge_colors.append("#F1C40F")
+      else:
+        edge_colors.append("green")
 
-    nx.draw_networkx_edge_labels(
-      G, pos, edge_labels=edge_labels, font_color="darkblue"
+    max_debit = max((G[u][v]["debit"] for u, v in G.edges), default=0)
+    edge_widths = [
+        1.5 + 5.5 * (G[u][v]["debit"] / max_debit) if max_debit > 0 else 1.5
+        for u, v in G.edges
+    ]
+  else:
+    edge_colors = [
+        "red" if G[u][v]["debit"] == G[u][v]["capacite"] else "#7F8C8D"
+        for u, v in G.edges
+    ]
+    edge_widths = [
+        3.0 if G[u][v]["debit"] == G[u][v]["capacite"] else 1.5
+        for u, v in G.edges
+    ]
+
+  # 3. Dessin séparé des nœuds, labels et arêtes
+  courbure = "arc3,rad=0.08"
+  taille_noeud = 2100
+
+  nx.draw_networkx_nodes(
+      G,
+      pos,
+      node_color="lightblue",
+      edgecolors="#2980B9",
+      linewidths=1.5,
+      node_size=taille_noeud,
+      ax=ax,
+  )
+  nx.draw_networkx_labels(G, pos, font_size=9, font_weight="bold", ax=ax)
+
+  nx.draw_networkx_edges(
+      G,
+      pos,
+      edge_color=edge_colors,
+      width=edge_widths,
+      arrowsize=18,
+      node_size=taille_noeud,
+      connectionstyle=courbure,
+      ax=ax,
   )
 
-    plt.title(titre)
-    plt.tight_layout()
-    plt.show()
+  # 4. Mise en évidence d'un chemin
+  if chemin_highlight:
+    if isinstance(chemin_highlight[0], tuple):
+      arcs_chemin = chemin_highlight
+      noeuds_chemin = list({noeud for arc in arcs_chemin for noeud in arc})
+    else:
+      noeuds_chemin = chemin_highlight
+      arcs_chemin = list(zip(noeuds_chemin[:-1], noeuds_chemin[1:]))
+
+    nx.draw_networkx_nodes(
+        G,
+        pos,
+        nodelist=noeuds_chemin,
+        node_color="gold",
+        edgecolors="#D4AC0D",
+        linewidths=1.5,
+        node_size=taille_noeud,  # Cohérent avec les flèches pour ne pas masquer les pointes
+        ax=ax,
+    )
+    nx.draw_networkx_edges(
+        G,
+        pos,
+        edgelist=arcs_chemin,
+        edge_color="dodgerblue",
+        width=4.0,
+        arrowsize=22,
+        node_size=taille_noeud,
+        connectionstyle=courbure,
+        ax=ax,
+    )
+
+  # 5. Étiquettes des arcs horizontales (rotate=False)
+  edge_labels = {
+      (u, v): f"{G[u][v]['debit']}/{G[u][v]['capacite']}/{G[u][v]['latence']}ms/{G[u][v]['cout']}$"
+      for u, v in G.edges
+  }
+  nx.draw_networkx_edge_labels(
+      G,
+      pos,
+      edge_labels=edge_labels,
+      font_size=8,
+      font_color="darkblue",
+      label_pos=0.5,
+      rotate=False,
+      bbox=dict(
+          boxstyle="round,pad=0.2",
+          facecolor="white",
+          edgecolor="none",
+          alpha=0.85,
+      ),
+      ax=ax,
+  )
+
+  ax.margins(0.10)
+  plt.axis("off")
+  plt.title(titre, fontsize=14, fontweight="bold", pad=15)
+  plt.tight_layout()
+  plt.show()
+
 
 # ============================================================
 # FONCTIONS DE LATENCE ET PLUS COURT CHEMIN (TP2)
@@ -260,7 +377,7 @@ def infos_arcs(graph_data, debits):
     taux_utilisations = {}
     latences_c = {}
 
-    print("\n--- Débit f / capacité c sur chaque arc ---")
+    #print("\n--- Débit f / capacité c sur chaque arc ---")
     for (u, v), capacite in arcs.items():
         debit = debits.get((u, v), 0)
         latence = latences.get((u, v), 0)
@@ -269,7 +386,7 @@ def infos_arcs(graph_data, debits):
 
         taux_utilisations[(u, v)] = taux_utilisation
         latences_c[(u, v)] = latence_C
-        print(f"{u} -> {v} : f = {debit}, c = {capacite}, f/c = {taux_utilisation:.2f}, latence = {latence_C:.2f}")
+        #print(f"{u} -> {v} : f = {debit}, c = {capacite}, f/c = {taux_utilisation:.2f}, latence = {latence_C:.2f}")
 
     return taux_utilisations, latences_c
 
@@ -317,19 +434,25 @@ def bfs(graph_data, source, sink, chemins_deja_trouves):
     return None
 
 
-def dijkstra(graph_data, chemins_trouves, poids_arcs=None):
-    """Trouve le chemin de poids minimal parmi les chemins découverts (sans NetworkX)."""
+def dijkstra(graph_data, chemins_trouves, poids_arcs=None, residual=None):
+    """Trouve le chemin de poids minimal parmi les chemins ayant encore de la capacité."""
     if poids_arcs is None:
         poids_arcs = extraire_latences(graph_data)
+        
 
     Valeur_Dijsktra = float('inf')
-    Chemin_plus_court = []
-    for chemin in chemins_trouves:#On prends les chemins trouvés
-        Valeur_chemin = sum(poids_arcs.get(arc, 0) for arc in chemin) #   à réécrire
-        if Valeur_Dijsktra > Valeur_chemin:#On garde en mémoire le plus petit
+    Chemin_plus_court = None  # None par défaut (et non []) pour déclencher l'arrêt
+
+    for chemin in chemins_trouves:
+        # Si on fournit un graphe résiduel, on ignore les chemins ayant un arc saturé
+        if residual is not None:
+            if any(residual.get(arc, 0) <= 0 for arc in chemin):
+                continue
+
+        Valeur_chemin = sum(poids_arcs.get(arc, 0) for arc in chemin)
+        if Valeur_chemin < Valeur_Dijsktra:
             Valeur_Dijsktra = Valeur_chemin
             Chemin_plus_court = chemin
-        #print(f"La somme de du chemin est {Valeur_chemin} ") 
 
     return Valeur_Dijsktra, Chemin_plus_court
 
@@ -344,37 +467,54 @@ def tri_priorité(demandes):
                 Priorite_sorted.append(demande)
     return Priorite_sorted
 
+def Saturation(capacite_a_ajouter):
+    global capacite_sature
+    capacite_sature+=capacite_a_ajouter
+    return capacite_sature
 
-def calcul_residuel2(graph_data, source, sink, debits, residual,capacite_a_ajouter, afficher=True,):
+def calcul_residuel2(graph_data, debits, residual, capacite_a_ajouter, chemins_trouves, afficher=True,cout=False):
     _, arcs, _, _ = extraire_donnees_graphe(graph_data)
     numero_chemin = 1
-    capacite_coupe = 0
 
-    while True and capacite_a_ajouter>0:#On boucle tant que l'on a pas trouvé tous les chemins
+    while capacite_a_ajouter > 0:
         if afficher:
             print(f"\n--- Recherche du chemin numéro {numero_chemin} ---")
-        parent = bfs_residual(graph_data, source, sink, residual)#On appelle la fonction bfs pour récupérer les parents
-        path = reconstruct_path(parent, source, sink)#On reconstruit le chemin  en fonction du bfs
-        #Cassage si pas de chemin trouvé dans le bfs
+            print(f"Il faut ajouter {capacite_a_ajouter}")
+
+        # 1. Mise à jour des latences dynamiques (BPR) selon les débits actuels
+        _, latences_dynamiques = infos_arcs(graph_data, debits)
+
+        # 2. Recherche du chemin le moins latent parmi ceux non saturés
+        if cout:
+            couts=extraire_cout(graph_data)
+            valeur_poids, path = dijkstra(
+                        graph_data,
+                        chemins_trouves,
+                        poids_arcs=couts,
+                        residual=residual
+                    )
+        else:
+            valeur_poids, path = dijkstra(
+            graph_data,
+            chemins_trouves,
+            poids_arcs=latences_dynamiques,
+            residual=residual
+        )
+
         if path is None:
             if afficher:
-                print(f"Aucun chemin résiduel de {source} vers {sink}.")
-                # --- RÉALISATION DE LA COUPE MINIMALE --- Appel fonction coupe
-            capacite_coupe, _ = coupe(graph_data, source, residual, afficher=afficher)
+                print("Plus aucun chemin résiduel disponible pour absorber le reste de la demande.")
+                print(f"{Saturation(capacite_a_ajouter)}Mbit/s n'a pu être placé")                
             break
 
         if afficher:
-            #Affiche le chemin et les parents
-            print(f"Prédécesseurs : {parent}")
-            print(f"Chemin trouvé : {path}")
-        quantite_a_ajoutermax = bottleneck(path, residual)#On calcule la plus petite quantité possible à ajouter sur le chemin
-        if afficher:
-            print(f"Quantité supplémentaire possible : {quantite_a_ajoutermax}")
+            print(f"Chemin trouvé : {path} (latence totale : {valeur_poids:.2f} ms)")
+
+        quantite_a_ajoutermax = bottleneck(path, residual)
         ajout_faisable = min(capacite_a_ajouter, quantite_a_ajoutermax)
         capacite_a_ajouter -= ajout_faisable
-        for arc in path:
-            u, v = arc
-            #Gestion des arêtes "retour" pour le calcul des débits
+        
+        for u, v in path:
             if (u, v) in arcs:
                 debits[(u, v)] += ajout_faisable
                 debit_actuel = debits[(u, v)]
@@ -384,262 +524,15 @@ def calcul_residuel2(graph_data, source, sink, debits, residual,capacite_a_ajout
 
             residual[(u, v)] -= ajout_faisable
             residual[(v, u)] = residual.get((v, u), 0) + ajout_faisable
-            #Affiche les valeurs trouvées pour le chemin
+
             if afficher:
-                print(
-                    f"Arc {u} -> {v} : "
-                    f"débit = {debit_actuel}, "
-                    f"capacité restante = {residual[(u, v)]}"
-                )
+                print(f"Arc {u} -> {v} : débit = {debit_actuel}, capacité restante = {residual[(u, v)]}")
+        print(f"Il reste {capacite_a_ajouter} à ajouter")
         numero_chemin += 1
 
-    return capacite_coupe
-
-
-def afficher_graphe_etat_congestion(arcs,pos,debits,latences,taux_utilisations,titre="État du réseau"):
-  """Affiche le graphe orienté avec les débits, capacités, latences et taux d'utilisation."""
-  G = nx.DiGraph()
-  for (u, v), capacite in arcs.items():
-    G.add_edge(u,v,capacite=capacite,latence=latences.get((u, v), 0),debit=debits.get((u, v), 0),taux_utilisation=taux_utilisations.get((u, v), 0),)
-
-  # Création d'une nouvelle fenêtre à chaque appel (évite d'écraser les graphes précédents)
-  plt.figure(num=titre, figsize=(10, 6))
-   #Modification des couleurs en fonction de l'utilisation
-  edge_colors = []
-  for edge in G.edges:
-        taux_utilisation = G[edge[0]][edge[1]]['taux_utilisation']
-        if taux_utilisation>0.9:
-            edge_colors.append('red')
-        elif taux_utilisation > 0.5:
-            edge_colors.append('yellow')
-        else:
-            edge_colors.append('green')
-
-    # Modification des largeurs en fonction du débit
-  max_debit = 0
-  for u, v in G.edges:
-        debit = G[u][v]['debit']
-        if debit > max_debit:
-            max_debit = debit
-  
-  edge_widths = []
-  for edge in G.edges:
-        debit = G[edge[0]][edge[1]]['debit']
-        if max_debit > 0:
-        # Épaisseur comprise entre 1.0 (vide) et 6.5 (débit max)
-            width = 1.0 + 6.5 * (debit / max_debit)
-        else:
-            width = 1.0
-        edge_widths.append(width)
-  # 3. Dessin du graphe
-  nx.draw(G,pos,with_labels=True,node_color="lightblue",node_size=2500,font_weight="bold",arrowsize=20,edge_color=edge_colors,width=edge_widths,
-  )
-
-
-  # 4. Étiquettes des arcs (débit / capacité / latence)
-  edge_labels = {}
-  for u, v in G.edges:
-    cap = G[u][v]["capacite"]
-    lat = G[u][v]["latence"]
-    deb = G[u][v]["debit"]
-    edge_labels[(u, v)] = f"{deb}/{cap}/{lat}ms"
-
-  nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color="darkblue")
-
-  plt.title(titre)
-  plt.tight_layout()
-  plt.show() 
-
-
-def afficher_graphe_dijkstra(arcs,pos,debits,latences,taux_utilisations,titre="État du réseau",chemin_highlight=None,):
-  """Affiche le graphe orienté avec les débits, capacités, latences et taux d'utilisation."""
-  G = nx.DiGraph()
-  for (u, v), capacite in arcs.items():
-    G.add_edge(u,v,capacite=capacite,latence=latences.get((u, v), 0),debit=debits.get((u, v), 0),taux_utilisation=taux_utilisations.get((u, v), 0),)
-
-  # Création d'une nouvelle fenêtre à chaque appel (évite d'écraser les graphes précédents)
-  plt.figure(num=titre, figsize=(10, 6))
-  edge_colors = ['red' if debits[edge] == G[edge[0]][edge[1]]['capacite'] else 'gray' for edge in G.edges]
-  edge_widths = [3.0 if debits[edge] == G[edge[0]][edge[1]]['capacite'] else 1.2 for edge in G.edges]
-  # 3. Dessin du graphe
-  nx.draw(G,pos,with_labels=True,node_color="lightblue",node_size=2500,font_weight="bold",arrowsize=20,edge_color=edge_colors,width=edge_widths,)
-
-  # Optionnel : mettre en évidence un chemin (gère le format liste d'arcs OU liste de nœuds)
-  if chemin_highlight:
-    if isinstance(chemin_highlight[0], tuple):
-      noeuds_chemin = list({noeud for arc in chemin_highlight for noeud in arc})
-      arcs_chemin = chemin_highlight
-    
-    # Surligne les nœuds du chemin en doré
-    nx.draw_networkx_nodes(
-        G, pos, nodelist=noeuds_chemin, node_color="gold", node_size=2600
-    )
-
-    # Surligne aussi les flèches du chemin en bleu électrique
-    nx.draw_networkx_edges(
-        G,
-        pos,
-        edgelist=arcs_chemin,
-        edge_color="dodgerblue",
-        width=4.0,
-        arrowsize=25,
-    )
-
-  # 4. Étiquettes des arcs (débit / capacité / latence)
-  edge_labels = {}
-  for u, v in G.edges:
-    cap = G[u][v]["capacite"]
-    lat = G[u][v]["latence"]
-    deb = G[u][v]["debit"]
-    edge_labels[(u, v)] = f"{deb}/{cap}/{lat}ms"
-
-  nx.draw_networkx_edge_labels(
-      G, pos, edge_labels=edge_labels, font_color="darkblue"
-  )
-
-  plt.title(titre)
-  plt.tight_layout()
-  plt.show() 
-# ============================================================
-# TP3 - ANALYSE D'IMPACTS, CONNECTIVITÉ ET PANNES N-1
-# (100% Python natif avec extraire_donnees_graphe, sans NetworkX)
-# ============================================================
-
-def calculer_flot_et_coupe(graph_data, source, sink):
-    """
-    Calcule le flot maximal et la coupe minimale sur graph_data
-    en utilisant extraire_donnees_graphe et les fonctions de Projet_main.
-    """
-    sommets, arcs, successeurs, _ = extraire_donnees_graphe(graph_data)
-    debits_loc = {arc: 0 for arc in arcs}
-    residual_loc = dict(arcs)
-
-    capacite_coupe = calcul_residuel(graph_data, source, sink, debits_loc, residual_loc, afficher=False)
-    _, arcs_coupe = coupe(graph_data, source, residual_loc, afficher=False)
-
-    valeur_totale_flot = sum(
-        debits_loc.get((source, cible), 0) for cible in successeurs.get(source, [])
-    )
-
-    return arcs, debits_loc, residual_loc, valeur_totale_flot, arcs_coupe, capacite_coupe
-
-
-def desactiver_arc(graph_data, arc_source, arc_destination):
-    """Retourne une copie de graph_data où l'arc donné est désactivé."""
-    copie_graph = {}
-    for src, targets in graph_data.items():
-        copie_targets = []
-        for target in targets:
-            nouvelle_arete = dict(target)
-            if src == arc_source and target["to"] == arc_destination:
-                nouvelle_arete["enabled"] = False
-            copie_targets.append(nouvelle_arete)
-        copie_graph[src] = copie_targets
-    return copie_graph
-
-
-def classer_impacts(graph_data, source, sink):
-    """Calcule l'impact de la suppression de chaque arc sur le flot maximal."""
-    arcs, _, _, performance_nominale, _, _ = calculer_flot_et_coupe(graph_data, source, sink)
-
-    impacts = []
-    for arc in arcs:
-        graphe_sans_arc = desactiver_arc(graph_data, arc[0], arc[1])
-        _, _, _, performance_sans_arc, _, _ = calculer_flot_et_coupe(graphe_sans_arc, source, sink)
-        impact = performance_nominale - performance_sans_arc #I(e) = F(G) − F(G − e).
-        impacts.append((arc, performance_sans_arc, impact))
-
-    impacts.sort(key=lambda resultat: resultat[2], reverse=True)
-    return impacts
-
-
-def dfs_connectivite(graph_data, sommet_depart):
-    """Retourne l'ensemble des sommets atteignables depuis sommet_depart (sans NetworkX)."""
-    _, _, successeurs, _ = extraire_donnees_graphe(graph_data)
-    visites = {sommet_depart}
-    pile = [sommet_depart]
-    while pile:
-        sommet_courant = pile.pop()
-        for voisin in successeurs.get(sommet_courant, []):
-            if voisin not in visites:
-                visites.add(voisin)
-                pile.append(voisin)
-    return visites
-
-
-def etude_disable_connectivite(graph_data):
-    """Pour chaque sommet, désactive chaque arc un par un et retourne les sommets isolés."""
-    sommets, arcs, _, _ = extraire_donnees_graphe(graph_data)
-    resultats = []
-    for sommet in sommets:
-        accessibles_avant = dfs_connectivite(graph_data, sommet)
-        for arc in arcs:
-            graphe_sans_arc = desactiver_arc(graph_data, arc[0], arc[1])
-            accessibles_apres = dfs_connectivite(graphe_sans_arc, sommet)
-            sommets_isoles = accessibles_avant - accessibles_apres
-            resultats.append((sommet, arc, sommets_isoles))
-    return resultats
-
-
-def desactiver_sommet(graph, sommet):
-    """Retourne une copie de graph où toutes les arêtes incidentes de sommet sont désactivées."""
-    copie_graph = {}
-    for arc_source, targets in graph.items():
-        copie_targets = []
-        for target in targets:
-            nouvelle_arete = dict(target)
-            if arc_source == sommet or nouvelle_arete["to"] == sommet:
-                nouvelle_arete["enabled"] = False
-            copie_targets.append(nouvelle_arete)
-        copie_graph[arc_source] = copie_targets
-    return copie_graph
-
-
-def analyser_desactivation_sommet(graph_data, sommet, source, sink):
-    """
-    Analyse l'impact de la désactivation d'un sommet sur le flot maximal,
-    les zones servies, le taux d'utilisation et la coupe minimale.
-    """
-    resultats = {}
-    graphe_sans_sommet = desactiver_sommet(graph_data, sommet)
-
-    arcs_apres, debits_apres, _, performance_apres, arcs_coupe, capacite_coupe = calculer_flot_et_coupe(graphe_sans_sommet, source, sink)
-    resultats["performance_apres_desactivation"] = performance_apres
-    
-    #Taux maintenu après coupure
-    _, _, _, performance_nominale, _, _ = calculer_flot_et_coupe(graph_data, source, sink)
-    if performance_nominale > 0:
-        taux_maintenu = (performance_apres / performance_nominale) * 100
-    else:
-        taux_maintenu = 0
-    resultats["taux_trafic_maintenu"] = round(taux_maintenu, 2)
-    resultats["taux_perte"] = round(100 - taux_maintenu, 2)
-    
-    zones = [u for u, targets in graph_data.items() if any(t["to"] == sink for t in targets)]
-    zones_non_servies = []
-    for zone in zones:
-        demande = next((t["capacite"] for t in graph_data[zone] if t["to"] == sink), 0)
-        recu = debits_apres.get((zone, sink), 0)
-        if recu < demande:
-            zones_non_servies.append(f"{zone} ({recu}/{demande})")
-    resultats["zones_non_servies"] = zones_non_servies
-
-    taux_max = 0
-    for (u, v), cap in arcs_apres.items():
-        if cap > 0:
-            taux = (debits_apres.get((u, v), 0) / cap) * 100
-            if taux > taux_max:
-                taux_max = taux
-    resultats["taux_max_utilisation"] = round(taux_max, 2)
-
-    resultats["arcs_coupe_minimale"] = arcs_coupe
-    resultats["capacite_coupe_minimale"] = capacite_coupe
-
-    return resultats
-
 
 # ============================================================
-# PROGRAMME PRINCIPAL (TP1 + TP2 + TP3)
+# PROGRAMME PRINCIPAL (TP1 + TP2)
 # ============================================================
 
 def trouver_source_et_puits(graph_data):
@@ -657,7 +550,7 @@ def trouver_source_et_puits(graph_data):
     return sources[0], sinks[0]
 
 def main():
-    graph_data = graph_data_TP2
+    graph_data = graph_data_TP1
 
     # ============================================================
     # ÉTAPE 1 - Extraction et initialisation des données
@@ -689,18 +582,12 @@ def main():
 
     # Création du graphe résiduel initial
     residual = {}
-    residual2={}
     for arc, capacite in arcs.items():
         residual[arc] = capacite - debits[arc]
-        residual2[arc] = capacite - debits[arc]
 
     # ============================================================
     # TP1 - Calcul du flot maximal et de la coupe minimale
     # ============================================================
-    print(f"============================================================")
-    print(f"                          TP1                               ")
-    print(f"============================================================")
-            
     capacite_coupe = calcul_residuel(graph_data, source, sink, debits, residual, afficher=False)
     debit_arc(debits, residual)
     valeur_flot_tp1 = calcul_flot(graph_data, source, debits, capacite_coupe)
@@ -708,34 +595,113 @@ def main():
     # ============================================================
     # Représentation graphique TP1
     # ============================================================
-    afficher_graphe(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,titre=(f"TP1 Étape 0 - Débits | Flot: {valeur_flot_tp1} ms"))
+    afficher_graphe_reseau(arcs=arcs,pos=pos_TP1,debits=debits,latences=latences,titre=(f"TP1 Étape 0 - Débits | Flot: {valeur_flot_tp1} ms"))
 
     # ============================================================
-    # TP2 - Latences dynamiques et plus court chemin (Dijkstra)
+    # TP2 - Congestion
     # ============================================================
-    print(f"============================================================")
-    print(f"                          TP2                              ")
-    print(f"============================================================")
-            
     taux_utilisations, _ = infos_arcs(graph_data, debits)
-    afficher_graphe_etat_congestion(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,titre=(f"Étape Débits | Affichage de la congestion"))
+    afficher_graphe_reseau(arcs=arcs,pos=pos_TP1,debits=debits,latences=latences,taux_utilisations=taux_utilisations,titre=(f"Étape Débits | Affichage de la congestion"),mode_congestion=True)
+    
+     # ============================================================
+        # TP2 - Latences dynamiques et plus court chemin (Dijkstra)
+        # ============================================================
+    graph_data = graph_data_TP2cout#Modification du graphe avec une latence supplémentaire
+    # 1. Ré-extraction des données propres à graph_data_TP2cout
+    _, arcs, _, _ = extraire_donnees_graphe(graph_data)
+    latences = extraire_latences(graph_data)
+    couts = extraire_cout(graph_data)
+    source, sink = trouver_source_et_puits(graph_data)
+    
+    # 2. Réinitialisation des débits/taux sur les nouveaux arcs (si non encore calculés)
     chemins_trouves = recherche_all_chemins(graph_data, source, sink)
     Distance, Chemin = dijkstra(graph_data, chemins_trouves)
     print("\n")
     print(f"Le chemin le plus court a pour distance : {Distance} et est {Chemin}")
-    afficher_graphe_dijkstra(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,titre=(f"Étape 1 - Initial | Flot: {valeur_flot_tp1} | Dijkstra: {Distance} ms"),chemin_highlight=Chemin,)
+    afficher_graphe_reseau(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,titre=(f"Étape 1 - Initial | Dijkstra: {Distance} ms"),chemin_highlight=Chemin,)
     graph_data = graph_data_TP2_ajout_latenceR1#Modification du graphe avec une latence supplémentaire
+    latences = extraire_latences(graph_data)
     chemins_trouves = recherche_all_chemins(graph_data, source, sink)
     Distance,Chemin= dijkstra(graph_data,chemins_trouves)
     print("\n")
     print(f"Réflexion ingénieur - Si la latence change, le parcours aussi, test en augmentant une arrete")
     print(f"Le chemin le plus court a pour distance : {Distance} et est {Chemin}")
-    afficher_graphe_dijkstra(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,titre=(f"Étape 2 - Modification latence R1 | Flot: {valeur_flot_tp1} | Dijkstra: {Distance} ms"),chemin_highlight=Chemin,)
+    afficher_graphe_reseau(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,titre=(f"Étape 2 - Modification latence R1-R3 | Dijkstra: {Distance} ms"),chemin_highlight=Chemin,)
 
 
-    graph_data = graph_data_TP2
-    for arc in arcs:
-            debits[arc] = 0
+# ============================================================
+        # TP2 - couts et plus court chemin (Dijkstra)
+        # ============================================================
+    graph_data = graph_data_TP2cout#Modification du graphe avec une latence supplémentaire
+    latences = extraire_latences(graph_data)
+    couts=extraire_cout(graph_data)
+    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
+    Distance,Chemin= dijkstra(graph_data,chemins_trouves,couts)
+    print("\n")
+    afficher_graphe_reseau(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,couts=couts,titre=(f"Étape 2 - Avec le cout | Dijkstra: {Distance} $"),chemin_highlight=Chemin,)
+
+    # ============================================================
+    # TP2 - Exemple streamflow gestion latence
+    # ============================================================ 
+    graph_data = graph_data_Streamflow_exemple
+     #1. Ré-extraction des données propres à graph_data_Streamflow
+    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
+    latences = extraire_latences(graph_data)
+    couts=extraire_cout(graph_data)
+
+    # 2. Détection de la source et du puits AVANT la recherche de chemins
+    source, sink = trouver_source_et_puits(graph_data)
+    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
+
+    # 3. Réinitialisation des débits et du graphe résiduel sur les nouveaux arcs
+    debits = {arc: 0 for arc in arcs}
+    residual2 = {arc: capacite for arc, capacite in arcs.items()}
+
+    calcul_residuel2(graph_data, debits, residual2,720,chemins_trouves, afficher=True,)#Il faudrait calculer le flot a chaque fois
+    taux_utilisations,latence_c = infos_arcs(graph_data, debits) 
+    afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - Flux priorisation latence"),mode_congestion=True)
+    # ============================================================
+    # TP2 - Exemple streamflow gestion cout
+     # ============================================================ 
+     #1. Ré-extraction des données propres à graph_data_Streamflow
+    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
+    latences = extraire_latences(graph_data)
+    couts=extraire_cout(graph_data)
+
+    # 2. Détection de la source et du puits AVANT la recherche de chemins
+    source, sink = trouver_source_et_puits(graph_data)
+    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
+
+    # 3. Réinitialisation des débits et du graphe résiduel sur les nouveaux arcs
+    debits = {arc: 0 for arc in arcs}
+    residual2 = {arc: capacite for arc, capacite in arcs.items()}
+    
+    calcul_residuel2(graph_data, debits, residual2,720,chemins_trouves, afficher=True,cout=True)#Il faudrait calculer le flot a chaque fois
+    taux_utilisations,latence_c = infos_arcs(graph_data, debits) 
+    afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - Flux priorisation cout"),mode_congestion=True)
+    
+    # ============================================================
+    # TP2 - Exemple streamflow gestion priorité congestion
+    # ============================================================  
+
+    graph_data = graph_data_Streamflow
+
+    # 1. Ré-extraction des données propres à graph_data_Streamflow
+    sommets, arcs, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
+    latences = extraire_latences(graph_data)
+    couts=extraire_cout(graph_data)
+
+    # 2. Détection de la source et du puits AVANT la recherche de chemins
+    source, sink = trouver_source_et_puits(graph_data)
+    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
+
+    # 3. Réinitialisation des débits et du graphe résiduel sur les nouveaux arcs
+    debits = {arc: 0 for arc in arcs}
+    residual2 = {arc: capacite for arc, capacite in arcs.items()}
+
+    # ============================================================
+    # TP2 - Exemple streamflow avec priorité
+    # ============================================================  
     ###ETAPE5
     demandes={
         "CONTROL": {"débit":20,"Priorité":'critique'},
@@ -748,190 +714,25 @@ def main():
     print("\n")
     print(Priorite_sorted)
     #pour chaque demande, construire le sous-graphe des arcs ayant assez de capacité résiduelle ; 
-    
-    calcul_residuel2(graph_data, source, sink, debits, residual2,20, afficher=True,)#Il faudrait calculer le flot a chaque fois 
-    afficher_graphe(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,titre=(f"TP2 Étape 5 - Critique | Flot: {valeur_flot_tp1} ms"))
-    calcul_residuel2(graph_data, source, sink, debits, residual2,180, afficher=True,)
-    afficher_graphe(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,titre=(f"TP2 Étape 5 - Elevé | Flot: {valeur_flot_tp1} ms"))
-    calcul_residuel2(graph_data, source, sink, debits, residual2,220, afficher=True,)
-    afficher_graphe(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,titre=(f"TP2 Étape 5 - normale | Flot: {valeur_flot_tp1} ms"))
-    calcul_residuel2(graph_data, source, sink, debits, residual2,300, afficher=True,)
-    afficher_graphe(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,titre=(f"TP2 Étape 5 - faible | Flot: {valeur_flot_tp1} ms"))
+    print("CONTROL")
+    calcul_residuel2(graph_data, debits, residual2,20,chemins_trouves, afficher=True,)#Il faudrait calculer le flot a chaque fois
+    taux_utilisations,latence_c = infos_arcs(graph_data, debits) 
+    afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - Critique"),mode_congestion=True)
+    print("LIVE")
+    calcul_residuel2(graph_data, debits, residual2,180,chemins_trouves, afficher=True,)
+    taux_utilisations, latence_c = infos_arcs(graph_data, debits)
+    afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - Elevé"),mode_congestion=True)
+    print("VOD")
+    calcul_residuel2(graph_data, debits, residual2,220,chemins_trouves, afficher=True,)
+    taux_utilisations, latence_c = infos_arcs(graph_data, debits)
+    afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - normale "),mode_congestion=True)
+    print("BACKUP")
+    calcul_residuel2(graph_data, debits, residual2,300,chemins_trouves, afficher=True,)
+    taux_utilisations, latence_c = infos_arcs(graph_data, debits)
+    afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - faible "),mode_congestion=True)
     # calculer un chemin selon un poids choisi ; 
     # placer le trafic ; 
     # mettre à jour capacités résiduelles et latences ;
     #continuer
-
-    # ============================================================
-    # TP3
-    # ============================================================
-    # On retrouve automatiquement la source et le puits pour le graphe TP3
-    print(f"============================================================")
-    print(f"                          TP3                               ")
-    print(f"============================================================")
-        
-    
-    source_tp3, puit_tp3 = trouver_source_et_puits(graph_data_TP3)
-
-    impacts = classer_impacts(graph_data_TP3, source_tp3, puit_tp3)
-
-    print("\n--- Classement des impacts ---") 
-    for arc, performance_sans_arc, impact in impacts:
-        print(
-            f"{arc[0]} -> {arc[1]} : "
-            f"flot sans l'arc = {performance_sans_arc}, "
-            f"impact = {impact}"
-        )
-
-    ### Graphe initial, puis R1-R3 désactivé, puis R3-Clients désactivé (sans etudier_scenario)
-    scenarios_tp3 = [graph_data_TP3, graph_data_TP3_R1R3disable, graph_data_TP3_R3Clidisable]
-    titres_tp3 = [
-        "TP3 - Scénario initial",
-        "TP3 - Arc R1 -> R3 désactivé",
-        "TP3 - Arc R3 -> Clients désactivé",
-    ]
-    pos_tp3 = {
-        "DC": (0, 1),
-        "R1": (1, 2),
-        "R2": (1, 0),
-        "R3": (2, 2),
-        "R4": (2, 0),
-        "Clients": (3, 1),
-    }
-
-    for indice in range(len(scenarios_tp3)):
-        donnees = scenarios_tp3[indice]
-        titre_scen = titres_tp3[indice]
-
-        arcs_scen, debits_scen, residual_scen, _, arcs_coupe_scen, capacite_coupe_scen = calculer_flot_et_coupe(
-            donnees, source_tp3, puit_tp3
-        )
-        print(f"\n--- {titre_scen} ({source_tp3} -> {puit_tp3}) ---")
-        debit_arc(debits_scen, residual_scen)
-        calcul_flot(donnees, source_tp3, debits_scen, capacite_coupe_scen)
-        print(f"Arcs de la coupe minimale : {arcs_coupe_scen} (capacité = {capacite_coupe_scen})")
-
-        # Représentation graphique avec la fonction afficher_graphe (comme TP1/TP2)
-        afficher_graphe(
-            arcs=arcs_scen,
-            pos=pos_tp3,
-            debits=debits_scen,
-            latences=None,
-            titre=f"{titre_scen} | Flot max : {capacite_coupe_scen} (Arcs saturés en rouge)",
-        )
-
-    dfs = dfs_connectivite(graph_data_TP3, source_tp3)
-    print(f"\nSommets atteignables depuis {source_tp3} : {dfs}")
-
-    resultats_connectivite = etude_disable_connectivite(graph_data_TP3)
-
-    # On retrouve automatiquement la source et le puits pour le réseau datacenter
-    source_dc, puit_dc = trouver_source_et_puits(graph_data_TP3_datacenter)
-
-    # Représentation graphique du réseau datacenter (avec afficher_graphe comme TP1/TP2)
-    arcs_dc, debits_dc, _, flot_dc, _, _ = calculer_flot_et_coupe(
-        graph_data_TP3_datacenter, source_dc, puit_dc
-    )
-    pos_dc = {
-        "S*": (0, 1),
-        "DC-LILLE": (2, 2),
-        "DC-PARIS": (2, 1),
-        "DC-LYON": (2, 0),
-        "LIL": (4, 2),
-        "PAR": (4, 1),
-        "LYO": (4, 0),
-        "REI": (6, 1.5),
-        "STR": (6, 0.5),
-        "NORD": (8, 2),
-        "IDF": (8, 1),
-        "Sud-Est": (8, 0),
-        "T*": (10, 1),
-    }
-    afficher_graphe(arcs=arcs_dc,pos=pos_dc,debits=debits_dc,latences=None,titre=f"TP3 - Réseau Datacenter nominal | Flot max : {flot_dc} Gbps (Arcs saturés en rouge)",)
-
-    sommet_a_tester = ["DC-LILLE", "DC-PARIS", "DC-LYON", "LIL", "PAR", "LYO", "REI", "STR"]
-    for sommet in sommet_a_tester:
-        print(f"\n--- Étude de connectivité graph_data_TP3_datacenter - Désactivation de {sommet} ---")
-        resultats_connectivite_dict = analyser_desactivation_sommet(graph_data_TP3_datacenter, sommet, source_dc, puit_dc)
-        trafic_perdu = 0
-        for (u, v), debit in debits_dc.items():
-            if u == sommet:
-                trafic_perdu += debit
-        trafic_avant_reroutage = flot_dc - trafic_perdu
-        print(f"Trafic après panne (avant reroutage) de {sommet} : {trafic_avant_reroutage} Gbps")
-        print(f"Performance après désactivation de {sommet} : {resultats_connectivite_dict['performance_apres_desactivation']}")
-        print(f"Taux maximal d'utilisation : {resultats_connectivite_dict['taux_max_utilisation']}%")
-        print(f"Taux de trafic maintenu : {resultats_connectivite_dict['taux_trafic_maintenu']}% (perte : {resultats_connectivite_dict['taux_perte']}%)")
-        print(f"Zones non totalement servies : {resultats_connectivite_dict['zones_non_servies']}")
-        print(f"Arcs de la coupe minimale : {resultats_connectivite_dict['arcs_coupe_minimale']}")
-        print(f"Capacité de la coupe minimale : {resultats_connectivite_dict['capacite_coupe_minimale']}")
-    
-    #Partie E
-    # Représentation de l'incident DC-PARIS : Nominal (1050) | Après panne avant reroutage (550) | Après reroutage (580) pas la source fictive ?? à revoir
-    print(f"PARTIE E")
-    arcs_dcparis, debits_dcparis, _, flot_dcparis, _, _ = calculer_flot_et_coupe(
-        graph_data_TP3_datacenter_DCPARIS_disable, source_dc, puit_dc
-    )
-
-    # Vue après panne, avant reroutage : on retire uniquement les 3 flux spécifiques de DC-PARIS (500 Gbps)
-    # 10 Gbps -> NORD, 310 Gbps -> IDF, 180 Gbps -> Sud-Est
-    debits_dcparis_avant_reroutage = {}
-    for arc in arcs_dcparis:
-        debits_dcparis_avant_reroutage[arc] = debits_dc.get(arc, 0)
-
-    flux_dcparis = [
-        ([("PAR", "REI"), ("REI", "NORD"), ("NORD", "T*")], 10),
-        ([("PAR", "REI"), ("REI", "IDF"), ("IDF", "T*")], 310),
-        ([("PAR", "STR"), ("STR", "Sud-Est"), ("Sud-Est", "T*")], 180),
-    ]
-    for chemin_arcs, quantite in flux_dcparis:
-        for arc in chemin_arcs:
-            if arc in debits_dcparis_avant_reroutage:
-                debits_dcparis_avant_reroutage[arc] -= quantite
-
-    flot_dcparis_avant = flot_dc - 500
-    taux_avant = round((flot_dcparis_avant / flot_dc) * 100, 1) if flot_dc > 0 else 0
-    taux_apres = round((flot_dcparis / flot_dc) * 100, 1) if flot_dc > 0 else 0
-
-    vues_dcparis = [
-        ("1. État nominal", arcs_dc, debits_dc, f"Flot : {flot_dc} Gbps (100.0%)"),
-        ("2. Après panne DC-PARIS (avant reroutage)", arcs_dcparis, debits_dcparis_avant_reroutage, f"Flot : {flot_dcparis_avant} Gbps ({taux_avant}%)"),
-        ("3. Après reroutage (Panne DC-PARIS)", arcs_dcparis, debits_dcparis, f"Flot : {flot_dcparis} Gbps ({taux_apres}% | +30 Gbps)"),
-    ]
-
-    fig, axes = plt.subplots(1, 3, figsize=(19, 6),num="TP3 Partie E - Incident DC-PARIS (Avant / Panne / Reroutage)")
-
-    for i in range(len(vues_dcparis)):
-        titre_vue, arcs_e, debits_e, sous_titre = vues_dcparis[i]
-        ax_courant = axes[i]
-
-        G_e = nx.DiGraph()
-        for (u, v), cap in arcs_e.items():
-            G_e.add_edge(u, v, capacite=cap, debit=debits_e.get((u, v), 0))
-
-        edge_colors_e = []
-        edge_widths_e = []
-        edge_labels_e = {}
-        for edge in G_e.edges:
-            u = edge[0]
-            v = edge[1]
-            cap_arc = G_e[u][v]["capacite"]
-            deb_arc = G_e[u][v]["debit"]
-            edge_labels_e[edge] = f"{deb_arc}/{cap_arc}"
-            if deb_arc == cap_arc:
-                edge_colors_e.append("red")
-                edge_widths_e.append(2.5)
-            else:
-                edge_colors_e.append("gray")
-                edge_widths_e.append(1.1)
-
-        nx.draw(G_e, pos_dc, ax=ax_courant, with_labels=True, node_color="lightblue",node_size=900, font_weight="bold", font_size=7, arrowsize=12,edge_color=edge_colors_e, width=edge_widths_e,)
-        nx.draw_networkx_edge_labels( G_e, pos_dc, edge_labels=edge_labels_e, ax=ax_courant,font_color="darkblue", font_size=6)
-        ax_courant.set_title(f"{titre_vue}\n{sous_titre}", fontsize=10, fontweight="bold")
-
-    plt.tight_layout()
-    plt.show()
-    
-
 if __name__ == "__main__":
     main()

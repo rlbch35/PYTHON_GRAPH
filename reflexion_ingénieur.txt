@@ -31,3 +31,7 @@ Réflexion d’ingénieur – Capacité de secours
 Non, car elle peut êre utilse en cas de "casse"... elle joue son rôle de secours..
 Dans les cas simulé, quand on coupe R3-->Clinet, R1-->R4 sature alors qu'elle est peut sollicitée en situation nominale
 
+
+
+BFS 
+Residuel
