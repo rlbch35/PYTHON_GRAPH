@@ -1,5 +1,6 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+import heapq
 from collections import deque
 from graphes import *
 
@@ -434,27 +435,45 @@ def bfs(graph_data, source, sink, chemins_deja_trouves):
     return None
 
 
-def dijkstra(graph_data, chemins_trouves, poids_arcs=None, residual=None):
-    """Trouve le chemin de poids minimal parmi les chemins ayant encore de la capacité."""
+def dijkstra(graph_data, source, sink, poids_arcs=None, residual=None):
+    """Algorithme de Dijkstra : trouve le chemin de poids minimal entre source et sink (sans NetworkX)."""
+    sommets, _, successeurs, _ = extraire_donnees_graphe(graph_data)
     if poids_arcs is None:
         poids_arcs = extraire_latences(graph_data)
-        
 
-    Valeur_Dijsktra = float('inf')
-    Chemin_plus_court = None  # None par défaut (et non []) pour déclencher l'arrêt
+    distances = {sommet: float('inf') for sommet in sommets}
+    distances[source] = 0
+    parent = {source: None}
+    visites = set()
+    tas = [(0, source)]  # File de priorité : (distance_actuelle, sommet)
 
-    for chemin in chemins_trouves:
-        # Si on fournit un graphe résiduel, on ignore les chemins ayant un arc saturé
-        if residual is not None:
-            if any(residual.get(arc, 0) <= 0 for arc in chemin):
+    while tas:
+        dist_u, u = heapq.heappop(tas)
+
+        if u in visites:
+            continue
+        visites.add(u)
+
+        if u == sink:
+            break
+
+        for v in successeurs.get(u, []):
+            # Si un graphe résiduel est fourni, on ignore les arcs saturés
+            if residual is not None and residual.get((u, v), 0) <= 0:
                 continue
 
-        Valeur_chemin = sum(poids_arcs.get(arc, 0) for arc in chemin)
-        if Valeur_chemin < Valeur_Dijsktra:
-            Valeur_Dijsktra = Valeur_chemin
-            Chemin_plus_court = chemin
+            poids = poids_arcs.get((u, v), 0)
+            nouvelle_distance = dist_u + poids
+            # Relâchement de l'arc (u, v)
+            if nouvelle_distance < distances[v]:
+                distances[v] = nouvelle_distance
+                parent[v] = u
+                heapq.heappush(tas, (nouvelle_distance, v))
 
-    return Valeur_Dijsktra, Chemin_plus_court
+    chemin = reconstruct_path(parent, source, sink)
+    if chemin is None:
+        return float('inf'), None
+    return distances[sink], chemin
 
 
 def tri_priorité(demandes):
@@ -472,8 +491,9 @@ def Saturation(capacite_a_ajouter):
     capacite_sature+=capacite_a_ajouter
     return capacite_sature
 
-def calcul_residuel2(graph_data, debits, residual, capacite_a_ajouter, chemins_trouves, afficher=True,cout=False):
+def calcul_residuel2(graph_data, debits, residual, capacite_a_ajouter, chemins_trouves=None, afficher=True, cout=False):
     _, arcs, _, _ = extraire_donnees_graphe(graph_data)
+    source, sink = trouver_source_et_puits(graph_data)
     numero_chemin = 1
 
     while capacite_a_ajouter > 0:
@@ -486,20 +506,22 @@ def calcul_residuel2(graph_data, debits, residual, capacite_a_ajouter, chemins_t
 
         # 2. Recherche du chemin le moins latent parmi ceux non saturés
         if cout:
-            couts=extraire_cout(graph_data)
+            couts = extraire_cout(graph_data)
             valeur_poids, path = dijkstra(
-                        graph_data,
-                        chemins_trouves,
-                        poids_arcs=couts,
-                        residual=residual
-                    )
+                graph_data,
+                source,
+                sink,
+                poids_arcs=couts,
+                residual=residual,
+            )
         else:
             valeur_poids, path = dijkstra(
-            graph_data,
-            chemins_trouves,
-            poids_arcs=latences_dynamiques,
-            residual=residual
-        )
+                graph_data,
+                source,
+                sink,
+                poids_arcs=latences_dynamiques,
+                residual=residual,
+            )
 
         if path is None:
             if afficher:
@@ -613,16 +635,14 @@ def main():
     couts = extraire_cout(graph_data)
     source, sink = trouver_source_et_puits(graph_data)
     
-    # 2. Réinitialisation des débits/taux sur les nouveaux arcs (si non encore calculés)
-    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
-    Distance, Chemin = dijkstra(graph_data, chemins_trouves)
+    # 2. Calcul du plus court chemin (Dijkstra)
+    Distance, Chemin = dijkstra(graph_data, source, sink)
     print("\n")
     print(f"Le chemin le plus court a pour distance : {Distance} et est {Chemin}")
     afficher_graphe_reseau(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,titre=(f"Étape 1 - Initial | Dijkstra: {Distance} ms"),chemin_highlight=Chemin,)
     graph_data = graph_data_TP2_ajout_latenceR1#Modification du graphe avec une latence supplémentaire
     latences = extraire_latences(graph_data)
-    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
-    Distance,Chemin= dijkstra(graph_data,chemins_trouves)
+    Distance, Chemin = dijkstra(graph_data, source, sink)
     print("\n")
     print(f"Réflexion ingénieur - Si la latence change, le parcours aussi, test en augmentant une arrete")
     print(f"Le chemin le plus court a pour distance : {Distance} et est {Chemin}")
@@ -635,8 +655,7 @@ def main():
     graph_data = graph_data_TP2cout#Modification du graphe avec une latence supplémentaire
     latences = extraire_latences(graph_data)
     couts=extraire_cout(graph_data)
-    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
-    Distance,Chemin= dijkstra(graph_data,chemins_trouves,couts)
+    Distance, Chemin = dijkstra(graph_data, source, sink, poids_arcs=couts)
     print("\n")
     afficher_graphe_reseau(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,couts=couts,titre=(f"Étape 2 - Avec le cout | Dijkstra: {Distance} $"),chemin_highlight=Chemin,)
 
