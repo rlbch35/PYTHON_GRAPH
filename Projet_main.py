@@ -1,6 +1,5 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-from collections import deque
 from graphes import *
 
 
@@ -391,49 +390,6 @@ def infos_arcs(graph_data, debits):
     return taux_utilisations, latences_c
 
 
-def recherche_all_chemins(graph_data, source, sink):
-    """Trouve tous les chemins simples possibles entre source et sink."""
-    chemins_trouves = set()
-    while True:
-        path = bfs(graph_data, source, sink, chemins_trouves)
-        if path is None:
-            break
-        chemins_trouves.add(tuple(path))
-    return chemins_trouves
-
-
-def bfs(graph_data, source, sink, chemins_deja_trouves):
-    """
-    Cherche un chemin qui n'a pas été trouvé entre source et sink en largeur,
-    en utilisant extraire_donnees_graphe.
-    """
-    _, _, successeurs, _ = extraire_donnees_graphe(graph_data)
-    # La file stocke des chemins entiers (listes de sommets) et non plus de simples noeuds
-    queue = deque([[source]])
-
-    while queue:
-        chemin_sommets = queue.popleft()
-        noeud_actuel = chemin_sommets[-1]
-        # Si on a atteint la sink, on formate le chemin en liste d'arcs (u, v)
-        if noeud_actuel == sink:
-            chemin_arcs = [
-                (chemin_sommets[i], chemin_sommets[i + 1])
-                for i in range(len(chemin_sommets) - 1)
-            ]
-            # On ne le retourne que s'il n'a pas déjà été découvert lors d'un tour précédent
-            if tuple(chemin_arcs) not in chemins_deja_trouves:
-                return chemin_arcs
-        
-        # On explore tous les voisins directs
-        for voisin in successeurs.get(noeud_actuel, []):
-            # 'voisin not in chemin_sommets' empêche uniquement de tourner en rond (cycles),
-            # mais autorise d'autres chemins à réutiliser les mêmes sommets et arêtes.
-            if voisin not in chemin_sommets:
-                queue.append(chemin_sommets + [voisin])
-
-    return None
-
-
 def dijkstra(graph_data, source, sink, poids_arcs=None, residual=None):
     """
     Algorithme de Dijkstra (sans heapq ni NetworkX) : trouve le chemin de poids minimal entre source et sink.
@@ -497,7 +453,7 @@ def Saturation(capacite_a_ajouter):
     capacite_sature+=capacite_a_ajouter
     return capacite_sature
 
-def calcul_residuel2(graph_data, debits, residual, capacite_a_ajouter, chemins_trouves=None, afficher=True, cout=False):
+def calcul_residuel2(graph_data, debits, residual, capacite_a_ajouter, afficher=True, cout=False):
     _, arcs, _, _ = extraire_donnees_graphe(graph_data)
     source, sink = trouver_source_et_puits(graph_data)
     numero_chemin = 1
@@ -676,13 +632,12 @@ def main():
 
     # 2. Détection de la source et du puits AVANT la recherche de chemins
     source, sink = trouver_source_et_puits(graph_data)
-    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
 
     # 3. Réinitialisation des débits et du graphe résiduel sur les nouveaux arcs
     debits = {arc: 0 for arc in arcs}
     residual2 = {arc: capacite for arc, capacite in arcs.items()}
 
-    calcul_residuel2(graph_data, debits, residual2,720,chemins_trouves, afficher=True,)#Il faudrait calculer le flot a chaque fois
+    calcul_residuel2(graph_data, debits, residual2,720,afficher=True,)#Il faudrait calculer le flot a chaque fois
     taux_utilisations,latence_c = infos_arcs(graph_data, debits) 
     afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - Flux priorisation latence"),mode_congestion=True)
     # ============================================================
@@ -695,13 +650,12 @@ def main():
 
     # 2. Détection de la source et du puits AVANT la recherche de chemins
     source, sink = trouver_source_et_puits(graph_data)
-    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
 
     # 3. Réinitialisation des débits et du graphe résiduel sur les nouveaux arcs
     debits = {arc: 0 for arc in arcs}
     residual2 = {arc: capacite for arc, capacite in arcs.items()}
     
-    calcul_residuel2(graph_data, debits, residual2,720,chemins_trouves, afficher=True,cout=True)#Il faudrait calculer le flot a chaque fois
+    calcul_residuel2(graph_data, debits, residual2,720,afficher=True,cout=True)#Il faudrait calculer le flot a chaque fois
     taux_utilisations,latence_c = infos_arcs(graph_data, debits) 
     afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - Flux priorisation cout"),mode_congestion=True)
     
@@ -718,7 +672,6 @@ def main():
 
     # 2. Détection de la source et du puits AVANT la recherche de chemins
     source, sink = trouver_source_et_puits(graph_data)
-    chemins_trouves = recherche_all_chemins(graph_data, source, sink)
 
     # 3. Réinitialisation des débits et du graphe résiduel sur les nouveaux arcs
     debits = {arc: 0 for arc in arcs}
@@ -740,19 +693,19 @@ def main():
     print(Priorite_sorted)
     #pour chaque demande, construire le sous-graphe des arcs ayant assez de capacité résiduelle ; 
     print("CONTROL")
-    calcul_residuel2(graph_data, debits, residual2,20,chemins_trouves, afficher=True,)#Il faudrait calculer le flot a chaque fois
+    calcul_residuel2(graph_data, debits, residual2,20,afficher=True,)#Il faudrait calculer le flot a chaque fois
     taux_utilisations,latence_c = infos_arcs(graph_data, debits) 
     afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - Critique"),mode_congestion=True)
     print("LIVE")
-    calcul_residuel2(graph_data, debits, residual2,180,chemins_trouves, afficher=True,)
+    calcul_residuel2(graph_data, debits, residual2,180,afficher=True,)
     taux_utilisations, latence_c = infos_arcs(graph_data, debits)
     afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - Elevé"),mode_congestion=True)
     print("VOD")
-    calcul_residuel2(graph_data, debits, residual2,220,chemins_trouves, afficher=True,)
+    calcul_residuel2(graph_data, debits, residual2,220,afficher=True,)
     taux_utilisations, latence_c = infos_arcs(graph_data, debits)
     afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - normale "),mode_congestion=True)
     print("BACKUP")
-    calcul_residuel2(graph_data, debits, residual2,300,chemins_trouves, afficher=True,)
+    calcul_residuel2(graph_data, debits, residual2,300,afficher=True,)
     taux_utilisations, latence_c = infos_arcs(graph_data, debits)
     afficher_graphe_reseau(arcs=arcs,pos=pos_Streamflow,debits=debits,latences=latence_c,couts=couts,taux_utilisations=taux_utilisations,titre=(f"TP2 Étape 5 - faible "),mode_congestion=True)
     # calculer un chemin selon un poids choisi ; 
