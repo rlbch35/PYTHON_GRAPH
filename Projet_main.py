@@ -435,7 +435,15 @@ def bfs(graph_data, source, sink, chemins_deja_trouves):
 
 
 def dijkstra(graph_data, source, sink, poids_arcs=None, residual=None):
-    """Algorithme de Dijkstra (sans heapq ni NetworkX) : trouve le chemin de poids minimal entre source et sink."""
+    """
+    Algorithme de Dijkstra (sans heapq ni NetworkX) : trouve le chemin de poids minimal entre source et sink.
+    1. On initialise les distances à l'infini, sauf pour la source.
+    2. On choisit le sommet non visité ayant la plus petite distance connue.
+    3. On relâche tous ses arcs sortants (on met à jour les distances des voisins).
+    4. On répète jusqu'à ce que le puits soit atteint ou que tous les sommets soient visités. 
+    5. On reconstruit le chemin à partir du dictionnaire des parents.
+    6. On retourne la distance totale et le chemin trouvé.
+    """
     sommets, _, successeurs, _ = extraire_donnees_graphe(graph_data)
     if poids_arcs is None:
         poids_arcs = extraire_latences(graph_data)
