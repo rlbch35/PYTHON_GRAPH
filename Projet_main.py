@@ -60,10 +60,15 @@ def extraire_cout(graph_data):
 # FONCTIONS DE BASE : FLOT MAXIMAL & COUPE MINIMALE (TP1)
 # ============================================================
 
-def bfs_residual(graph_data, source, sink, residual):
+def bfs_residual(source, sink, residual):
     """
     Cherche un chemin entre source et sink avec une recherche en largeur.
-    """
+    Retourne un dictionnaire des parents pour reconstruire le chemin.
+    1. On initialise le dictionnaire des parents avec la source et une file d'attente avec la source.
+    2. Tant que la file d'attente n'est pas vide, on prend le premier élément de la file.
+    3. Pour chaque arc dans le graphe résiduel, si le sommet de départ est le noeud actuel et que la capacité est positive,
+       on vérifie si le voisin n'est pas déjà dans les parents. Si ce n'est pas le cas, on l'ajoute aux parents.
+       Si le voisin est le puits, on retourne le dictionnaire des parents. Sinon, on ajoute le voisin à la file d'attente."""
     parent = {source: None}
     queue = [source]
     while queue:
@@ -80,12 +85,18 @@ def bfs_residual(graph_data, source, sink, residual):
 
 
 def reconstruct_path(parent, source, sink):
-    """Reconstruit le chemin à partir du dictionnaire des prédécesseurs."""
+    """Reconstruit le chemin à partir du dictionnaire des prédécesseurs.
+    1. On vérifie que le parent n'est pas vide et que le puit est dans parents.
+    2. On initialise un chemin vide et on se place au puit.
+    3. Tant que l'on est pas à la source, on récupère le parent du sommet, on définit l'arrete entre les deux,
+       on l'ajoute au chemin et on remonte les sommets parents.
+    4. On inverse le chemin pour bien avoir le début vers la fin et on retourne le chemin.
+       """
     #On vérifie que le parent n'est pas vide et que le puit est dans parents
     if parent is None or sink not in parent: 
         return None
     path = []
-    node = sink#On se place au puit
+    node = sink#On se place au puit car parent est un dictionnaire de prédécesseurs
     while node != source:#Tant que l'on est pas à la source
         precedent = parent[node]#On récupère le parent du sommet
         arc = (precedent, node)#On définit l'arrete entre les deux
@@ -96,7 +107,12 @@ def reconstruct_path(parent, source, sink):
 
 
 def bottleneck(path, residual):
-    """Retourne la plus petite capacité résiduelle du chemin."""
+    """Retourne la plus petite capacité résiduelle du chemin.
+    1. On vérifie que le chemin n'est pas vide.
+    2. On initialise la plus petite capacité avec la première valeur du chemin.
+    3. Pour chaque arc du chemin, on récupère la capacité dans le graphe résiduel.
+    4. Si la capacité est plus petite que la plus petite capacité actuelle, on met à jour la plus petite capacité.
+    5. On retourne la plus petite capacité trouvée."""
     if not path:
         return 0
     plus_petite_capacite = residual[path[0]]#On instancie la plus petite capacité avec la première valeur du chemin
@@ -110,6 +126,11 @@ def bottleneck(path, residual):
 def bfs_sommets_joignables(source, residual):
     """
     Cherche un chemin encore disponible.
+    1. On initialise le dictionnaire des parents avec la source et une file d'attente avec la source.
+    2. Tant que la file d'attente n'est pas vide, on prend le premier élément de la file.
+    3. Pour chaque arc dans le graphe résiduel, si le sommet de départ est le noeud actuel et que la capacité est positive,
+         on vérifie si le voisin n'est pas déjà dans les parents. Si ce n'est pas le cas, on l'ajoute aux parents et à la file d'attente.
+    4. On retourne la liste des sommets joignables à partir de la source.
     """
     parent = {source: None}
     queue = [source]
@@ -125,7 +146,13 @@ def bfs_sommets_joignables(source, residual):
 
 
 def coupe(graph_data, source, residual, afficher=True):
-    """Calcule la coupe minimale en Python natif via extraire_donnees_graphe."""
+    """Calcule la coupe minimale en Python natif via extraire_donnees_graphe.
+    1. On extrait les sommets et arcs du graphe.
+    2. On récupère l'ensemble A des sommets joignables à partir de la source dans le graphe résiduel.
+    3. On définit l'ensemble B comme la différence entre tous les sommets et l'ensemble A.
+    4. On calcule la capacité de la coupe en sommant les capacités des arcs allant de A vers B.
+    5. On retourne la capacité de la coupe et la liste des arcs de la coupe.
+    """
     sommets, arcs, _, _ = extraire_donnees_graphe(graph_data)
     ensemble_A = bfs_sommets_joignables(source, residual)
     # On récupère ça dans le sous-ensemble A
@@ -146,6 +173,17 @@ def coupe(graph_data, source, residual, afficher=True):
 
 
 def calcul_residuel(graph_data, source, sink, debits, residual, afficher=True):
+    """
+    1. On extrait les sommets et arcs du graphe.
+    2. On initialise le numéro de chemin et la capacité de la coupe.
+    3. Tant qu'on trouve un chemin résiduel, on effectue les étapes suivantes :
+        a. On appelle bfs_residual pour récupérer les parents.
+        b. On reconstruit le chemin à partir des parents.
+        c. Si aucun chemin n'est trouvé, on calcule la coupe minimale et on sort de la boucle.
+        d. Sinon, on calcule la quantité maximale à ajouter sur le chemin (bottleneck).
+        e. Pour chaque arc du chemin, on met à jour les débits et le graphe résiduel.
+    4. On retourne la capacité de la coupe minimale trouvée.
+    """
     _, arcs, _, _ = extraire_donnees_graphe(graph_data)
     numero_chemin = 1
     capacite_coupe = 0
@@ -203,7 +241,10 @@ def debit_arc(debits, residual):
 
 
 def calcul_flot(graph_data, source, debits, capacite_coupe):
-    """Calcule et affiche le bilan final du flot à partir de extraire_donnees_graphe."""
+    """Calcule et affiche le bilan final du flot à partir de extraire_donnees_graphe.
+    1. On extrait les sommets et arcs du graphe.
+    2. On calcule la valeur totale du flot en sommant les débits sortants de la source.
+    3. On affiche le bilan final du flot."""
     _, _, successeurs, _ = extraire_donnees_graphe(graph_data)
     valeur_totale_flot = sum(debits.get((source, cible), 0) for cible in successeurs.get(source, []))
     print("\n--- Bilan final du flot ---")
@@ -371,7 +412,10 @@ def afficher_graphe_reseau(
 # ============================================================
 
 def infos_arcs(graph_data, debits):
-    """Calcule et affiche les taux d'utilisation et latences dynamiques (BPR) en Python natif."""
+    """Calcule et affiche les taux d'utilisation et latences dynamiques (BPR) en Python natif.
+    1. On extrait les sommets et arcs du graphe.
+    2. Pour chaque arc, on calcule le taux d'utilisation et la latence dynamique.
+    3. On affiche les résultats."""
     _, arcs, _, _ = extraire_donnees_graphe(graph_data)
     latences = extraire_latences(graph_data)
     taux_utilisations = {}
@@ -392,7 +436,10 @@ def infos_arcs(graph_data, debits):
 
 
 def recherche_all_chemins(graph_data, source, sink):
-    """Trouve tous les chemins simples possibles entre source et sink."""
+    """Trouve tous les chemins simples possibles entre source et sink.
+    1. On initialise un ensemble pour stocker les chemins trouvés.
+    2. Tant qu'on trouve un chemin, on l'ajoute à l'ensemble des chemins trouvés.
+    3. On retourne l'ensemble des chemins trouvés."""
     chemins_trouves = set()
     while True:
         path = bfs(graph_data, source, sink, chemins_trouves)
@@ -406,6 +453,13 @@ def bfs(graph_data, source, sink, chemins_deja_trouves):
     """
     Cherche un chemin qui n'a pas été trouvé entre source et sink en largeur,
     en utilisant extraire_donnees_graphe.
+    1. On extrait les successeurs du graphe.
+    2. On initialise une file d'attente avec un chemin contenant uniquement la source.
+    3. Tant que la file d'attente n'est pas vide, on prend le premier chemin.
+    4. Si le dernier noeud du chemin est le sink, on formate le chemin en liste d'arcs et on le retourne
+       s'il n'a pas déjà été découvert.
+    5. Sinon, on explore tous les voisins directs du dernier noeud et on ajoute les nouveaux chemins à la file d'attente.
+    6. Si aucun chemin n'est trouvé, on retourne None.
     """
     _, _, successeurs, _ = extraire_donnees_graphe(graph_data)
     # La file stocke des chemins entiers (listes de sommets) et non plus de simples noeuds
@@ -435,7 +489,14 @@ def bfs(graph_data, source, sink, chemins_deja_trouves):
 
 
 def dijkstra(graph_data, chemins_trouves, poids_arcs=None, residual=None):
-    """Trouve le chemin de poids minimal parmi les chemins ayant encore de la capacité."""
+    """Trouve le chemin de poids minimal parmi les chemins ayant encore de la capacité.
+    1. Si poids_arcs n'est pas fourni, on l'extrait depuis le graphe.
+    2. Pour chaque chemin, on calcule son poids en utilisant les poids des arcs.
+    3. On retourne le chemin de poids minimal.
+    4. Si un graphe résiduel est fourni, on ignore les chemins ayant un arc saturé.
+    5. Si aucun chemin n'est trouvé, on retourne None.
+    6. On retourne la valeur du chemin le plus court et le chemin lui-même.
+"""
     if poids_arcs is None:
         poids_arcs = extraire_latences(graph_data)
         
@@ -458,6 +519,9 @@ def dijkstra(graph_data, chemins_trouves, poids_arcs=None, residual=None):
 
 
 def tri_priorité(demandes):
+    """1. On définit l'ordre de priorité des demandes.
+    2. On parcourt les niveaux de priorité et on ajoute les demandes correspondantes à la liste triée.
+    3. On retourne la liste des demandes triées par priorité."""
     Priorite_sorted=[]
     niveaux=['critique','élevée','normale','faible']
     for niveau in niveaux:
@@ -473,6 +537,15 @@ def Saturation(capacite_a_ajouter):
     return capacite_sature
 
 def calcul_residuel2(graph_data, debits, residual, capacite_a_ajouter, chemins_trouves, afficher=True,cout=False):
+    """1. On extrait les sommets et arcs du graphe.
+    2. Tant qu'il reste de la capacité à ajouter, on effectue les étapes suivantes :
+        a. On met à jour les latences dynamiques selon les débits actuels.
+        b. On recherche le chemin le moins latent parmi ceux non saturés.
+        c. Si aucun chemin n'est trouvé, on affiche un message et on sort de la boucle.
+        d. Sinon, on calcule la quantité maximale à ajouter sur le chemin (bottleneck).
+        e. Pour chaque arc du chemin, on met à jour les débits et le graphe résiduel.
+    3. On retourne la capacité de la coupe minimale trouvée.
+"""
     _, arcs, _, _ = extraire_donnees_graphe(graph_data)
     numero_chemin = 1
 
@@ -536,7 +609,11 @@ def calcul_residuel2(graph_data, debits, residual, capacite_a_ajouter, chemins_t
 # ============================================================
 
 def trouver_source_et_puits(graph_data):
-    """Trouve automatiquement la source (sans prédécesseur) et le puits (sans successeur)."""
+    """Trouve automatiquement la source (sans prédécesseur) et le puits (sans successeur).
+    1. On extrait les sommets, successeurs et prédécesseurs du graphe.
+    2. On parcourt les sommets pour identifier la source et le puits.
+    3. Si le graphe ne contient pas exactement une source et un puits, on lève une exception.
+    4. On retourne la source et le puits."""
     sommets, _, successeurs, predecesseurs = extraire_donnees_graphe(graph_data)
     sources = []
     sinks = []
@@ -629,9 +706,9 @@ def main():
     afficher_graphe_reseau(arcs=arcs,pos=pos_TP2,debits=debits,latences=latences,taux_utilisations=taux_utilisations,titre=(f"Étape 2 - Modification latence R1-R3 | Dijkstra: {Distance} ms"),chemin_highlight=Chemin,)
 
 
-# ============================================================
-        # TP2 - couts et plus court chemin (Dijkstra)
-        # ============================================================
+    # ============================================================
+    # TP2 - couts et plus court chemin (Dijkstra)
+    # ============================================================
     graph_data = graph_data_TP2cout#Modification du graphe avec une latence supplémentaire
     latences = extraire_latences(graph_data)
     couts=extraire_cout(graph_data)
